@@ -1,6 +1,6 @@
 use nom::{branch, bytes, character, combinator, multi, number, sequence, IResult};
 
-use crate::pdf::{IndirectObject, Object};
+use crate::pdf::{IndirectObject, Object, Name};
 
 const TRUE_OBJECT: &str = "true";
 const FALSE_OBJECT: &str = "false";
@@ -88,6 +88,22 @@ pub(crate) fn null_object(input: &[u8]) -> IResult<&[u8], Object> {
     Ok((remainder, Object::Null))
 }
 
+pub(crate) fn name(input: &[u8]) -> IResult<&[u8], Name> {
+    let (remainder, _) = character::complete::char('/')(input)?;
+    let (remainder, name) = sequence::terminated(
+        bytes::complete::take_till(character::is_space),
+        character::complete::multispace1,
+    )(remainder)?;
+
+    // TODO: parse name and replace all #XX with char
+
+    Ok((remainder, name.to_vec()))
+}
+
+pub(crate) fn name_object(input: &[u8]) -> IResult<&[u8], Object> {
+    combinator::map(name, Object::from)(input)
+}
+
 pub(crate) fn indirect_object(input: &[u8]) -> IResult<&[u8], Object> {
     let (remainder, index) = character::complete::u32(input)?;
     let (remainder, _) = character::complete::multispace1(remainder)?;
@@ -122,6 +138,7 @@ pub(crate) fn object(input: &[u8]) -> IResult<&[u8], Object> {
         number_object,
         null_object,
         indirect_object,
+        name_object,
     ))(input)
 }
 
@@ -213,6 +230,21 @@ mod tests {
     pub fn test_null_object() {
         let empty = &b""[..];
         assert_eq!(null_object("null\n".as_bytes()), Ok((empty, Object::Null)));
+    }
+
+    #[test]
+    pub fn test_name_object() {
+        assert!(name_object(b"/Name1 ").is_ok());
+        assert!(name_object(b"/ASomewhatLongerName ").is_ok());
+        assert!(name_object(b"/A;Name_With-Various***Characters? ").is_ok());
+        assert!(name_object(b"/1.2 ").is_ok());
+        assert!(name_object(b"/$$ ").is_ok());
+        assert!(name_object(b"/@pattern ").is_ok());
+        assert!(name_object(b"/.notdef ").is_ok());
+        assert!(name_object(b"/lime#20Green ").is_ok());
+        assert!(name_object(b"/paired#28#29parentheses ").is_ok());
+        assert!(name_object(b"/The_Key_of_F#23_Minor ").is_ok());
+        assert!(name_object(b"/A#42 ").is_ok());
     }
 
     #[test]

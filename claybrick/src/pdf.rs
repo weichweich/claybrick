@@ -11,7 +11,7 @@ pub enum Object {
     Float(f32),
     Integer(i32),
     Bool(bool),
-    Name,
+    Name(Name),
     Array,
     Dictionary,
     Stream,
@@ -43,6 +43,12 @@ impl From<String> for Object {
     }
 }
 
+impl From<Name> for Object {
+    fn from(n: Name) -> Self {
+        Self::Name(n)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct IndirectObject {
     pub(crate) index: u32,
@@ -55,3 +61,6 @@ pub struct ReferenceObject {
     pub(crate) index: u32,
     pub(crate) generation: u32,
 }
+
+pub type Name = Vec<u8>;
+
