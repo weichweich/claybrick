@@ -91,7 +91,7 @@ pub(crate) fn null_object(input: &[u8]) -> IResult<&[u8], Object> {
 pub(crate) fn name(input: &[u8]) -> IResult<&[u8], Name> {
     let (remainder, _) = character::complete::char('/')(input)?;
     let (remainder, name) = sequence::terminated(
-        bytes::complete::take_till(character::is_space),
+        bytes::complete::take_till(|c| u8::is_ascii_whitespace(&c)),
         character::complete::multispace1,
     )(remainder)?;
 
