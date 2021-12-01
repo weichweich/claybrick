@@ -1,6 +1,6 @@
 use nom::{branch, bytes, character, combinator, multi, number, sequence, IResult};
 
-use crate::pdf::{Object, IndirectObject};
+use crate::pdf::{IndirectObject, Object};
 
 const TRUE_OBJECT: &str = "true";
 const FALSE_OBJECT: &str = "false";
@@ -69,10 +69,16 @@ pub(crate) fn bool_object(input: &[u8]) -> IResult<&[u8], Object> {
 }
 
 pub(crate) fn number_object(input: &[u8]) -> IResult<&[u8], Object> {
-    let (remainder, (f, _)) =
-        sequence::pair(number::complete::double, character::complete::multispace1)(input)?;
-
-    Ok((remainder, f.into()))
+    branch::alt((
+        combinator::map(
+            sequence::terminated(character::complete::i32, character::complete::multispace1),
+            Object::from,
+        ),
+        combinator::map(
+            sequence::terminated(number::complete::float, character::complete::multispace1),
+            Object::from,
+        ),
+    ))(input)
 }
 
 pub(crate) fn null_object(input: &[u8]) -> IResult<&[u8], Object> {
@@ -99,11 +105,14 @@ pub(crate) fn indirect_object(input: &[u8]) -> IResult<&[u8], Object> {
         ),
     )(remainder)?;
 
-    Ok((remainder, Object::IndirectObject(IndirectObject {
-        index: index,
-        generation: generation,
-        object: Box::new(object),
-    })))
+    Ok((
+        remainder,
+        Object::IndirectObject(IndirectObject {
+            index: index,
+            generation: generation,
+            object: Box::new(object),
+        }),
+    ))
 }
 
 pub(crate) fn object(input: &[u8]) -> IResult<&[u8], Object> {

@@ -8,8 +8,8 @@ pub struct Pdf {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Object {
     String(String),
-    Float(f64),
-    Integer(isize),
+    Float(f32),
+    Integer(i32),
     Bool(bool),
     Name,
     Array,
@@ -25,14 +25,14 @@ impl From<bool> for Object {
     }
 }
 
-impl From<isize> for Object {
-    fn from(v: isize) -> Self {
+impl From<i32> for Object {
+    fn from(v: i32) -> Self {
         Self::Integer(v)
     }
 }
 
-impl From<f64> for Object {
-    fn from(v: f64) -> Self {
+impl From<f32> for Object {
+    fn from(v: f32) -> Self {
         Self::Float(v)
     }
 }
@@ -48,4 +48,10 @@ pub struct IndirectObject {
     pub(crate) index: u32,
     pub(crate) generation: u32,
     pub(crate) object: Box<Object>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReferenceObject {
+    pub(crate) index: u32,
+    pub(crate) generation: u32,
 }
