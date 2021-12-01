@@ -75,8 +75,20 @@ pub(crate) fn number_object(input: &[u8]) -> IResult<&[u8], Object> {
     Ok((remainder, f.into()))
 }
 
+pub(crate) fn null_object(input: &[u8]) -> IResult<&[u8], Object> {
+    let (remainder, _) = bytes::complete::tag(b"null")(input)?;
+    let (remainder, _) = character::complete::multispace1(remainder)?;
+
+    Ok((remainder, Object::Null))
+}
+
 pub(crate) fn object0(input: &[u8]) -> IResult<&[u8], Vec<Object>> {
-    multi::many0(branch::alt((string_object, bool_object, number_object)))(input)
+    multi::many0(branch::alt((
+        string_object,
+        bool_object,
+        number_object,
+        null_object,
+    )))(input)
 }
 
 #[cfg(test)]
@@ -156,6 +168,15 @@ mod tests {
         assert_eq!(
             string_object("(123\\nmnbvcx)\n".as_bytes()),
             Ok((empty, Object::String("123\\nmnbvcx".to_owned())))
+        );
+    }
+
+    #[test]
+    pub fn test_null_object() {
+        let empty = &b""[..];
+        assert_eq!(
+            null_object("null\n".as_bytes()),
+            Ok((empty, Object::Null))
         );
     }
 }
