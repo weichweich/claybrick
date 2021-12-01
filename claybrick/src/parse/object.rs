@@ -1,6 +1,6 @@
 use nom::{branch, bytes, character, combinator, multi, number, sequence, IResult};
 
-use crate::pdf::Object;
+use crate::pdf::{Object, IndirectObject};
 
 const TRUE_OBJECT: &str = "true";
 const FALSE_OBJECT: &str = "false";
@@ -82,13 +82,42 @@ pub(crate) fn null_object(input: &[u8]) -> IResult<&[u8], Object> {
     Ok((remainder, Object::Null))
 }
 
-pub(crate) fn object0(input: &[u8]) -> IResult<&[u8], Vec<Object>> {
-    multi::many0(branch::alt((
+pub(crate) fn indirect_object(input: &[u8]) -> IResult<&[u8], Object> {
+    let (remainder, index) = character::complete::u32(input)?;
+    let (remainder, _) = character::complete::multispace1(remainder)?;
+    let (remainder, generation) = character::complete::u32(remainder)?;
+    let (remainder, _) = character::complete::multispace1(remainder)?;
+    let (remainder, object) = sequence::delimited(
+        sequence::pair(
+            bytes::complete::tag(b"obj"),
+            character::complete::multispace1,
+        ),
+        object,
+        sequence::pair(
+            bytes::complete::tag(b"endobj"),
+            character::complete::multispace1,
+        ),
+    )(remainder)?;
+
+    Ok((remainder, Object::IndirectObject(IndirectObject {
+        index: index,
+        generation: generation,
+        object: Box::new(object),
+    })))
+}
+
+pub(crate) fn object(input: &[u8]) -> IResult<&[u8], Object> {
+    branch::alt((
         string_object,
         bool_object,
         number_object,
         null_object,
-    )))(input)
+        indirect_object,
+    ))(input)
+}
+
+pub(crate) fn object0(input: &[u8]) -> IResult<&[u8], Vec<Object>> {
+    multi::many0(object)(input)
 }
 
 #[cfg(test)]
@@ -174,9 +203,22 @@ mod tests {
     #[test]
     pub fn test_null_object() {
         let empty = &b""[..];
+        assert_eq!(null_object("null\n".as_bytes()), Ok((empty, Object::Null)));
+    }
+
+    #[test]
+    pub fn test_indirect_object() {
+        let empty = &b""[..];
         assert_eq!(
-            null_object("null\n".as_bytes()),
-            Ok((empty, Object::Null))
+            indirect_object("0 0 obj null endobj ".as_bytes()),
+            Ok((
+                empty,
+                Object::IndirectObject(IndirectObject {
+                    index: 0,
+                    generation: 0,
+                    object: Box::new(Object::Null)
+                })
+            ))
         );
     }
 }

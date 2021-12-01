@@ -16,7 +16,7 @@ pub enum Object {
     Dictionary,
     Stream,
     Null,
-    IndirectObject,
+    IndirectObject(IndirectObject),
 }
 
 impl From<bool> for Object {
@@ -41,4 +41,11 @@ impl From<String> for Object {
     fn from(v: String) -> Self {
         Self::String(v)
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IndirectObject {
+    pub(crate) index: u32,
+    pub(crate) generation: u32,
+    pub(crate) object: Box<Object>,
 }
