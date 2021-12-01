@@ -1,6 +1,6 @@
-use nom::{branch, bytes, character, multi, sequence, IResult};
+use nom::{bytes, character, sequence, IResult};
 
-use crate::pdf::{Object, Pdf};
+use crate::pdf::Pdf;
 
 mod object;
 

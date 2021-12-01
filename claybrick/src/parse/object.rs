@@ -1,6 +1,6 @@
 use nom::{branch, bytes, character, combinator, multi, number, sequence, IResult};
 
-use crate::pdf::{IndirectObject, Object, Name};
+use crate::pdf::{Dictionary, IndirectObject, Name, Object};
 
 const TRUE_OBJECT: &str = "true";
 const FALSE_OBJECT: &str = "false";
@@ -104,18 +104,45 @@ pub(crate) fn name_object(input: &[u8]) -> IResult<&[u8], Object> {
     combinator::map(name, Object::from)(input)
 }
 
+pub(crate) fn dictionary_entry(input: &[u8]) -> IResult<&[u8], (Name, Object)> {
+    let (remainder, name) = name(input)?;
+    let (remainder, obj) = object(remainder)?;
+
+    Ok((remainder, (name, obj)))
+}
+
+pub(crate) fn dictionary_object(input: &[u8]) -> IResult<&[u8], Object> {
+    let (remainder, map) = sequence::delimited(
+        sequence::terminated(
+            bytes::complete::tag(b"<<"),
+            character::complete::multispace1,
+        ),
+        multi::fold_many0(dictionary_entry, Dictionary::new, |mut acc, (name, obj)| {
+            acc.insert(name, obj);
+            acc
+        }),
+        sequence::terminated(
+            bytes::complete::tag(b">>"),
+            character::complete::multispace1,
+        ),
+    )(input)?;
+
+    Ok((remainder, Object::Dictionary(map)))
+}
+
 pub(crate) fn indirect_object(input: &[u8]) -> IResult<&[u8], Object> {
     let (remainder, index) = character::complete::u32(input)?;
     let (remainder, _) = character::complete::multispace1(remainder)?;
     let (remainder, generation) = character::complete::u32(remainder)?;
     let (remainder, _) = character::complete::multispace1(remainder)?;
     let (remainder, object) = sequence::delimited(
-        sequence::pair(
+        sequence::terminated(
             bytes::complete::tag(b"obj"),
             character::complete::multispace1,
         ),
+        // TODO: handle special case `R` for reference
         object,
-        sequence::pair(
+        sequence::terminated(
             bytes::complete::tag(b"endobj"),
             character::complete::multispace1,
         ),
@@ -139,6 +166,7 @@ pub(crate) fn object(input: &[u8]) -> IResult<&[u8], Object> {
         null_object,
         indirect_object,
         name_object,
+        dictionary_object,
     ))(input)
 }
 
@@ -148,6 +176,8 @@ pub(crate) fn object0(input: &[u8]) -> IResult<&[u8], Vec<Object>> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     #[test]
@@ -245,6 +275,50 @@ mod tests {
         assert!(name_object(b"/paired#28#29parentheses ").is_ok());
         assert!(name_object(b"/The_Key_of_F#23_Minor ").is_ok());
         assert!(name_object(b"/A#42 ").is_ok());
+    }
+
+    #[test]
+    pub fn test_dictionary() {
+        let empty = &b""[..];
+
+        let obj = Object::Dictionary(HashMap::from([(b"Length".to_vec(), Object::Integer(93))]));
+        assert_eq!(dictionary_object(b"<< /Length 93 >> "), Ok((empty, obj)));
+
+        let obj = Object::Dictionary(HashMap::from([
+            (b"Type".to_vec(), Object::Name(b"Example".to_vec())),
+            (
+                b"Subtype".to_vec(),
+                Object::Name(b"DictionaryExample".to_vec()),
+            ),
+            (b"Version".to_vec(), Object::Float(0.01)),
+            (b"IntegerItem".to_vec(), Object::Integer(12)),
+            (
+                b"StringItem".to_vec(),
+                Object::String("a string".to_owned()),
+            ),
+            (
+                b"Subdictionary".to_vec(),
+                Object::Dictionary(HashMap::from([
+                    (b"Item2".to_vec(), Object::Bool(true)),
+                    (b"Item2".to_vec(), Object::Bool(true)),
+                ])),
+            ),
+        ]));
+        assert_eq!(
+            dictionary_object(
+                b"<< /Type /Example
+        /Subtype /DictionaryExample
+        /Version 0.01
+        /IntegerItem 12
+        /StringItem (a string)
+        /Subdictionary <<
+        /Item2 true
+        >>
+        >>
+        "
+            ),
+            Ok((empty, obj))
+        );
     }
 
     #[test]

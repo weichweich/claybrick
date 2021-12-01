@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 #[derive(Debug, Clone)]
 pub struct Pdf {
     pub(crate) version: (u8, u8),
@@ -13,7 +15,7 @@ pub enum Object {
     Bool(bool),
     Name(Name),
     Array,
-    Dictionary,
+    Dictionary(Dictionary),
     Stream,
     Null,
     IndirectObject(IndirectObject),
@@ -64,3 +66,4 @@ pub struct ReferenceObject {
 
 pub type Name = Vec<u8>;
 
+pub type Dictionary = HashMap<Name, Object>;
