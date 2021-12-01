@@ -1,8 +1,12 @@
-use nom::{bytes, character, IResult };
+use nom::{
+    bytes,
+    character::{self, complete::not_line_ending},
+    sequence, IResult,
+};
 
 use crate::pdf::Pdf;
 
-fn parse_version(input: &[u8]) -> IResult<&[u8], (u8, u8)> {
+fn version(input: &[u8]) -> IResult<&[u8], (u8, u8)> {
     let (remainder, _) = character::complete::multispace0(input)?;
     let (remainder, _) = bytes::complete::tag_no_case("%PDF-")(remainder)?;
     let (remainder, major) = character::complete::u8(remainder)?;
@@ -13,10 +17,37 @@ fn parse_version(input: &[u8]) -> IResult<&[u8], (u8, u8)> {
     Ok((remainder, (major, minor)))
 }
 
-pub(crate) fn parse(input: &[u8]) -> IResult<&[u8], Pdf> {
-    let (remainder, version) = parse_version(input)?;
+fn comment(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    let (remainder, _) = character::complete::multispace0(input)?;
+    let (remainder, (_, comment)) =
+        sequence::pair(character::complete::char('%'), not_line_ending)(remainder)?;
 
-    Ok((remainder, Pdf { version }))
+    Ok((remainder, comment))
+}
+
+fn binary_indicator(input: &[u8]) -> IResult<&[u8], bool> {
+    if let Ok((r, comment)) = comment(input) {
+        if comment.len() > 3 && comment.iter().find(|&d| *d < 128).is_none() {
+            Ok((r, true))
+        } else {
+            Ok((input, false))
+        }
+    } else {
+        Ok((input, false))
+    }
+}
+
+pub(crate) fn parse(input: &[u8]) -> IResult<&[u8], Pdf> {
+    let (remainder, version) = version(input)?;
+    let (remainder, announced_binary) = binary_indicator(remainder)?;
+
+    Ok((
+        remainder,
+        Pdf {
+            version,
+            announced_binary,
+        },
+    ))
 }
 
 #[cfg(test)]
@@ -25,8 +56,17 @@ mod tests {
 
     #[test]
     fn test_parse_version() {
-        assert_eq!(Ok((&[0u8; 0][..], (1, 8))), parse_version("%PDF-1.8".as_bytes()));
-        assert_eq!(Ok((&[0u8; 0][..], (1, 8))), parse_version("   \t\n   %PDF-1.8".as_bytes()));
-        assert_eq!(Ok((&[0u8; 0][..], (1, 8))), parse_version("   \t\n   %PDF-1.8 \t   ".as_bytes()));
+        assert_eq!(
+            Ok((&[0u8; 0][..], (1, 8))),
+            version("%PDF-1.8".as_bytes())
+        );
+        assert_eq!(
+            Ok((&[0u8; 0][..], (1, 8))),
+            version("   \t\n   %PDF-1.8".as_bytes())
+        );
+        assert_eq!(
+            Ok((&[0u8; 0][..], (1, 8))),
+            version("   \t\n   %PDF-1.8 \t   ".as_bytes())
+        );
     }
 }
