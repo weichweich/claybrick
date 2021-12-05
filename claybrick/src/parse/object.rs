@@ -1,6 +1,6 @@
 use nom::{branch, bytes, character, combinator, multi, number, sequence, IResult};
 
-use crate::pdf::{Dictionary, IndirectObject, Name, Object};
+use crate::pdf::{Array, Dictionary, IndirectObject, Name, Object, Reference};
 
 const TRUE_OBJECT: &str = "true";
 const FALSE_OBJECT: &str = "false";
@@ -130,43 +130,91 @@ pub(crate) fn dictionary_object(input: &[u8]) -> IResult<&[u8], Object> {
     Ok((remainder, Object::Dictionary(map)))
 }
 
+pub fn array_object(input: &[u8]) -> IResult<&[u8], Object> {
+    let (remainder, array) = sequence::delimited(
+        character::complete::char('['),
+        multi::fold_many0(object, Array::new, |mut acc, obj| {
+            acc.push(obj);
+            acc
+        }),
+        sequence::terminated(
+            character::complete::char(']'),
+            character::complete::multispace1,
+        ),
+    )(input)?;
+
+    Ok((remainder, Object::Array(array)))
+}
+
+fn referred_object<'a>(
+    index: u32,
+    generation: u32,
+) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Object> {
+    combinator::map(
+        sequence::delimited(
+            sequence::terminated(
+                bytes::complete::tag(b"obj"),
+                character::complete::multispace1,
+            ),
+            object,
+            sequence::terminated(
+                bytes::complete::tag(b"endobj"),
+                character::complete::multispace1,
+            ),
+        ),
+        move |obj| {
+            Object::IndirectObject(IndirectObject {
+                index: index,
+                generation: generation,
+                object: Box::new(obj),
+            })
+        },
+    )
+}
+
+fn reference_object<'a>(
+    index: u32,
+    generation: u32,
+) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Object> {
+    combinator::map(
+        sequence::terminated(
+            character::complete::char('R'),
+            character::complete::multispace1,
+        ),
+        move |_| {
+            Object::Reference(Reference {
+                index: index,
+                generation: generation,
+            })
+        },
+    )
+}
+
 pub(crate) fn indirect_object(input: &[u8]) -> IResult<&[u8], Object> {
     let (remainder, index) = character::complete::u32(input)?;
     let (remainder, _) = character::complete::multispace1(remainder)?;
     let (remainder, generation) = character::complete::u32(remainder)?;
     let (remainder, _) = character::complete::multispace1(remainder)?;
-    let (remainder, object) = sequence::delimited(
-        sequence::terminated(
-            bytes::complete::tag(b"obj"),
-            character::complete::multispace1,
-        ),
-        // TODO: handle special case `R` for reference
-        object,
-        sequence::terminated(
-            bytes::complete::tag(b"endobj"),
-            character::complete::multispace1,
-        ),
-    )(remainder)?;
 
-    Ok((
-        remainder,
-        Object::IndirectObject(IndirectObject {
-            index: index,
-            generation: generation,
-            object: Box::new(object),
-        }),
-    ))
+    branch::alt((
+        reference_object(index, generation),
+        referred_object(index, generation),
+    ))(remainder)
 }
 
 pub(crate) fn object(input: &[u8]) -> IResult<&[u8], Object> {
+    // The order is important!
     branch::alt((
-        string_object,
-        bool_object,
-        number_object,
-        null_object,
-        indirect_object,
-        name_object,
         dictionary_object,
+        array_object,
+        string_object,
+        // indirect object has to be tested before we try to parse an integer.
+        // `0 0 R` is an inderect object while `0 0` are two integers.
+        indirect_object,
+        number_object,
+        bool_object,
+        null_object,
+        name_object,
     ))(input)
 }
 
@@ -178,38 +226,9 @@ pub(crate) fn object0(input: &[u8]) -> IResult<&[u8], Vec<Object>> {
 mod tests {
     use std::collections::HashMap;
 
+    use crate::pdf::Reference;
+
     use super::*;
-
-    #[test]
-    pub fn test_bool_object() {
-        let empty = &b""[..];
-        assert_eq!(bool_object(b"true "), Ok((empty, Object::Bool(true))));
-        assert_eq!(bool_object(b"false "), Ok((empty, Object::Bool(false))));
-        assert!(bool_object(b"falsee").is_err());
-        assert!(bool_object(b"afalse").is_err());
-    }
-
-    #[test]
-    pub fn test_integer_object() {
-        let empty = &b""[..];
-        assert_eq!(number_object(b"123 "), Ok((empty, Object::Integer(123))));
-        assert_eq!(number_object(b"-123 "), Ok((empty, Object::Integer(-123))));
-    }
-
-    #[test]
-    pub fn test_float_object() {
-        let empty = &b""[..];
-        assert_eq!(
-            number_object(b"123.123 "),
-            Ok((empty, Object::Float(123.123)))
-        );
-        assert_eq!(
-            number_object(b"-123.123 "),
-            Ok((empty, Object::Float(-123.123)))
-        );
-        assert!(number_object(b"d123.123 ").is_err());
-        assert!(number_object(b"-1c23.123 ").is_err());
-    }
 
     #[test]
     pub fn test_consume_until_parenthesis() {
@@ -228,30 +247,55 @@ mod tests {
     }
 
     #[test]
+    pub fn test_bool_object() {
+        let empty = &b""[..];
+        assert_eq!(object(b"true "), Ok((empty, Object::Bool(true))));
+        assert_eq!(object(b"false "), Ok((empty, Object::Bool(false))));
+        assert!(object(b"falsee").is_err());
+        assert!(object(b"afalse").is_err());
+    }
+
+    #[test]
+    pub fn test_integer_object() {
+        let empty = &b""[..];
+        assert_eq!(object(b"123 "), Ok((empty, Object::Integer(123))));
+        assert_eq!(object(b"-123 "), Ok((empty, Object::Integer(-123))));
+    }
+
+    #[test]
+    pub fn test_float_object() {
+        let empty = &b""[..];
+        assert_eq!(object(b"123.123 "), Ok((empty, Object::Float(123.123))));
+        assert_eq!(object(b"-123.123 "), Ok((empty, Object::Float(-123.123))));
+        assert!(object(b"d123.123 ").is_err());
+        assert!(object(b"-1c23.123 ").is_err());
+    }
+
+    #[test]
     pub fn test_string_object() {
         let empty = &b""[..];
         assert_eq!(
-            string_object("()\n".as_bytes()),
+            object("()\n".as_bytes()),
             Ok((empty, Object::String("".to_owned())))
         );
         assert_eq!(
-            string_object("(a) ".as_bytes()),
+            object("(a) ".as_bytes()),
             Ok((empty, Object::String("a".to_owned())))
         );
         assert_eq!(
-            string_object("((a)) ".as_bytes()),
+            object("((a)) ".as_bytes()),
             Ok((empty, Object::String("(a)".to_owned())))
         );
         assert_eq!(
-            string_object(r"((\(a)) ".as_bytes()),
+            object(r"((\(a)) ".as_bytes()),
             Ok((empty, Object::String(r"(\(a)".to_owned())))
         );
         assert_eq!(
-            string_object(r"(a\)\)\)) ".as_bytes()),
+            object(r"(a\)\)\)) ".as_bytes()),
             Ok((empty, Object::String(r"a\)\)\)".to_owned())))
         );
         assert_eq!(
-            string_object("(123\\nmnbvcx)\n".as_bytes()),
+            object("(123\\nmnbvcx)\n".as_bytes()),
             Ok((empty, Object::String("123\\nmnbvcx".to_owned())))
         );
     }
@@ -259,22 +303,22 @@ mod tests {
     #[test]
     pub fn test_null_object() {
         let empty = &b""[..];
-        assert_eq!(null_object("null\n".as_bytes()), Ok((empty, Object::Null)));
+        assert_eq!(object("null\n".as_bytes()), Ok((empty, Object::Null)));
     }
 
     #[test]
     pub fn test_name_object() {
-        assert!(name_object(b"/Name1 ").is_ok());
-        assert!(name_object(b"/ASomewhatLongerName ").is_ok());
-        assert!(name_object(b"/A;Name_With-Various***Characters? ").is_ok());
-        assert!(name_object(b"/1.2 ").is_ok());
-        assert!(name_object(b"/$$ ").is_ok());
-        assert!(name_object(b"/@pattern ").is_ok());
-        assert!(name_object(b"/.notdef ").is_ok());
-        assert!(name_object(b"/lime#20Green ").is_ok());
-        assert!(name_object(b"/paired#28#29parentheses ").is_ok());
-        assert!(name_object(b"/The_Key_of_F#23_Minor ").is_ok());
-        assert!(name_object(b"/A#42 ").is_ok());
+        assert!(object(b"/Name1 ").is_ok());
+        assert!(object(b"/ASomewhatLongerName ").is_ok());
+        assert!(object(b"/A;Name_With-Various***Characters? ").is_ok());
+        assert!(object(b"/1.2 ").is_ok());
+        assert!(object(b"/$$ ").is_ok());
+        assert!(object(b"/@pattern ").is_ok());
+        assert!(object(b"/.notdef ").is_ok());
+        assert!(object(b"/lime#20Green ").is_ok());
+        assert!(object(b"/paired#28#29parentheses ").is_ok());
+        assert!(object(b"/The_Key_of_F#23_Minor ").is_ok());
+        assert!(object(b"/A#42 ").is_ok());
     }
 
     #[test]
@@ -282,7 +326,7 @@ mod tests {
         let empty = &b""[..];
 
         let obj = Object::Dictionary(HashMap::from([(b"Length".to_vec(), Object::Integer(93))]));
-        assert_eq!(dictionary_object(b"<< /Length 93 >> "), Ok((empty, obj)));
+        assert_eq!(object(b"<< /Length 93 >> "), Ok((empty, obj)));
 
         let obj = Object::Dictionary(HashMap::from([
             (b"Type".to_vec(), Object::Name(b"Example".to_vec())),
@@ -305,7 +349,7 @@ mod tests {
             ),
         ]));
         assert_eq!(
-            dictionary_object(
+            object(
                 b"<< /Type /Example
         /Subtype /DictionaryExample
         /Version 0.01
@@ -322,16 +366,49 @@ mod tests {
     }
 
     #[test]
+    pub fn test_array_object() {
+        let empty = &b""[..];
+        assert_eq!(
+            object(b"[549 3.14 false (Ralph) /SomeName] "),
+            Ok((
+                empty,
+                Object::Array(Array::from([
+                    Object::Integer(549),
+                    Object::Float(3.14),
+                    Object::Bool(false),
+                    Object::String("Ralph".to_string()),
+                    Object::Name(b"SomeName".to_vec())
+                ]))
+            ))
+        )
+    }
+
+    #[test]
     pub fn test_indirect_object() {
         let empty = &b""[..];
         assert_eq!(
-            indirect_object("0 0 obj null endobj ".as_bytes()),
+            object("0 0 obj null endobj ".as_bytes()),
             Ok((
                 empty,
                 Object::IndirectObject(IndirectObject {
                     index: 0,
                     generation: 0,
                     object: Box::new(Object::Null)
+                })
+            ))
+        );
+    }
+
+    #[test]
+    pub fn test_reference_object() {
+        let empty = &b""[..];
+        assert_eq!(
+            object("0 0 R ".as_bytes()),
+            Ok((
+                empty,
+                Object::Reference(Reference {
+                    index: 0,
+                    generation: 0,
                 })
             ))
         );

@@ -14,11 +14,12 @@ pub enum Object {
     Integer(i32),
     Bool(bool),
     Name(Name),
-    Array,
+    Array(Array),
     Dictionary(Dictionary),
     Stream,
     Null,
     IndirectObject(IndirectObject),
+    Reference(Reference),
 }
 
 impl From<bool> for Object {
@@ -59,7 +60,7 @@ pub struct IndirectObject {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ReferenceObject {
+pub struct Reference {
     pub(crate) index: u32,
     pub(crate) generation: u32,
 }
@@ -67,3 +68,5 @@ pub struct ReferenceObject {
 pub type Name = Vec<u8>;
 
 pub type Dictionary = HashMap<Name, Object>;
+
+pub type Array = Vec<Object>;
