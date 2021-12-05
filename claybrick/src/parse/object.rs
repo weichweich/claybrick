@@ -5,6 +5,27 @@ use crate::pdf::{Array, Dictionary, IndirectObject, Name, Object, Reference};
 const TRUE_OBJECT: &str = "true";
 const FALSE_OBJECT: &str = "false";
 
+fn is_delimiter(chr: u8) -> bool {
+    matches!(
+        chr,
+        b'(' | b')' | b'<' | b'>' | b'[' | b']' | b'{' | b'}' | b'/' | b'%'
+    )
+}
+
+fn is_regular(chr: u8) -> bool {
+    !is_delimiter(chr) && !chr.is_ascii_whitespace()
+}
+
+/// Consume all whitespace. If input doesn't start with a whitespace, peek the
+/// next char and require it to be a delimiter.
+fn require_termination(input: &[u8]) -> IResult<&[u8], ()> {
+    let (remainder, whitespace) = character::complete::multispace0(input)?;
+    if whitespace.is_empty() || input.is_empty() {
+        bytes::complete::take_while_m_n(1, 1, is_delimiter)(remainder)?;
+    }
+    Ok((remainder, ()))
+}
+
 fn consume_until_parenthesis(input: &[u8]) -> (&[u8], &[u8]) {
     bytes::complete::escaped::<_, (), _, _, _, _>(
         character::complete::none_of("\\()"),
@@ -48,7 +69,7 @@ pub(crate) fn string_object(input: &[u8]) -> IResult<&[u8], Object> {
         character::complete::char(')'),
     )(input)?;
 
-    let (remainder, _) = character::complete::multispace1(remainder)?;
+    let (remainder, _) = character::complete::multispace0(remainder)?;
 
     Ok((
         remainder,
@@ -57,13 +78,12 @@ pub(crate) fn string_object(input: &[u8]) -> IResult<&[u8], Object> {
 }
 
 pub(crate) fn bool_object(input: &[u8]) -> IResult<&[u8], Object> {
-    let (remainder, (obj, _)) = sequence::pair(
-        branch::alt((
-            combinator::value(Object::Bool(true), bytes::complete::tag(TRUE_OBJECT)),
-            combinator::value(Object::Bool(false), bytes::complete::tag(FALSE_OBJECT)),
-        )),
-        character::complete::multispace1,
-    )(input)?;
+    let (remainder, obj) = branch::alt((
+        combinator::value(Object::Bool(true), bytes::complete::tag(TRUE_OBJECT)),
+        combinator::value(Object::Bool(false), bytes::complete::tag(FALSE_OBJECT)),
+    ))(input)?;
+
+    let (remainder, _) = require_termination(remainder)?;
 
     Ok((remainder, obj))
 }
@@ -71,11 +91,11 @@ pub(crate) fn bool_object(input: &[u8]) -> IResult<&[u8], Object> {
 pub(crate) fn number_object(input: &[u8]) -> IResult<&[u8], Object> {
     branch::alt((
         combinator::map(
-            sequence::terminated(character::complete::i32, character::complete::multispace1),
+            sequence::terminated(character::complete::i32, require_termination),
             Object::from,
         ),
         combinator::map(
-            sequence::terminated(number::complete::float, character::complete::multispace1),
+            sequence::terminated(number::complete::float, require_termination),
             Object::from,
         ),
     ))(input)
@@ -83,17 +103,15 @@ pub(crate) fn number_object(input: &[u8]) -> IResult<&[u8], Object> {
 
 pub(crate) fn null_object(input: &[u8]) -> IResult<&[u8], Object> {
     let (remainder, _) = bytes::complete::tag(b"null")(input)?;
-    let (remainder, _) = character::complete::multispace1(remainder)?;
+    let (remainder, _) = require_termination(remainder)?;
 
     Ok((remainder, Object::Null))
 }
 
 pub(crate) fn name(input: &[u8]) -> IResult<&[u8], Name> {
     let (remainder, _) = character::complete::char('/')(input)?;
-    let (remainder, name) = sequence::terminated(
-        bytes::complete::take_till(|c| u8::is_ascii_whitespace(&c)),
-        character::complete::multispace1,
-    )(remainder)?;
+    let (remainder, name) = bytes::complete::take_while(is_regular)(remainder)?;
+    let (remainder, _) = require_termination(remainder)?;
 
     // TODO: parse name and replace all #XX with char
 
@@ -121,10 +139,7 @@ pub(crate) fn dictionary_object(input: &[u8]) -> IResult<&[u8], Object> {
             acc.insert(name, obj);
             acc
         }),
-        sequence::terminated(
-            bytes::complete::tag(b">>"),
-            character::complete::multispace1,
-        ),
+        sequence::terminated(bytes::complete::tag(b">>"), require_termination),
     )(input)?;
 
     Ok((remainder, Object::Dictionary(map)))
@@ -137,10 +152,7 @@ pub fn array_object(input: &[u8]) -> IResult<&[u8], Object> {
             acc.push(obj);
             acc
         }),
-        sequence::terminated(
-            character::complete::char(']'),
-            character::complete::multispace1,
-        ),
+        sequence::terminated(character::complete::char(']'), require_termination),
     )(input)?;
 
     Ok((remainder, Object::Array(array)))
@@ -157,10 +169,7 @@ fn referred_object<'a>(
                 character::complete::multispace1,
             ),
             object,
-            sequence::terminated(
-                bytes::complete::tag(b"endobj"),
-                character::complete::multispace1,
-            ),
+            sequence::terminated(bytes::complete::tag(b"endobj"), require_termination),
         ),
         move |obj| {
             Object::IndirectObject(IndirectObject {
@@ -177,10 +186,7 @@ fn reference_object<'a>(
     generation: u32,
 ) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Object> {
     combinator::map(
-        sequence::terminated(
-            character::complete::char('R'),
-            character::complete::multispace1,
-        ),
+        sequence::terminated(character::complete::char('R'), require_termination),
         move |_| {
             Object::Reference(Reference {
                 index: index,
@@ -380,7 +386,16 @@ mod tests {
                     Object::Name(b"SomeName".to_vec())
                 ]))
             ))
-        )
+        );
+        assert_eq!(object(b"[] "), Ok((empty, Object::Array(Array::from([])))));
+        assert_eq!(
+            object(b"[459] "),
+            Ok((empty, Object::Array(Array::from([Object::Integer(459),]))))
+        );
+        assert_eq!(
+            object(b"[false] "),
+            Ok((empty, Object::Array(Array::from([Object::Bool(false),]))))
+        );
     }
 
     #[test]
