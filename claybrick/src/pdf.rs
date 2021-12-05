@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Pdf {
     pub(crate) version: (u8, u8),
     pub(crate) announced_binary: bool,

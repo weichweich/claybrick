@@ -20,7 +20,8 @@ fn is_regular(chr: u8) -> bool {
 /// next char and require it to be a delimiter.
 fn require_termination(input: &[u8]) -> IResult<&[u8], ()> {
     let (remainder, whitespace) = character::complete::multispace0(input)?;
-    if whitespace.is_empty() || input.is_empty() {
+    if whitespace.is_empty() && !input.is_empty() {
+        // TODO: there has to be a better way to require one char that fullfils a condition?
         bytes::complete::take_while_m_n(1, 1, is_delimiter)(remainder)?;
     }
     Ok((remainder, ()))
@@ -225,7 +226,8 @@ pub(crate) fn object(input: &[u8]) -> IResult<&[u8], Object> {
 }
 
 pub(crate) fn object0(input: &[u8]) -> IResult<&[u8], Vec<Object>> {
-    multi::many0(object)(input)
+    let (remainder, _) = character::complete::multispace0(input)?;
+    multi::many0(object)(remainder)
 }
 
 #[cfg(test)]
@@ -235,6 +237,14 @@ mod tests {
     use crate::pdf::Reference;
 
     use super::*;
+
+    #[test]
+    pub fn test_termination() {
+        assert_eq!(require_termination(b"  asdf"), Ok((&b"asdf"[..], ())));
+        assert_eq!(require_termination(b""), Ok((&b""[..], ())));
+        assert_eq!(require_termination(b"("), Ok((&b"("[..], ())));
+        assert!(require_termination(b"asdf").is_err());
+    }
 
     #[test]
     pub fn test_consume_until_parenthesis() {
@@ -364,8 +374,7 @@ mod tests {
         /Subdictionary <<
         /Item2 true
         >>
-        >>
-        "
+        >>"
             ),
             Ok((empty, obj))
         );
@@ -375,7 +384,7 @@ mod tests {
     pub fn test_array_object() {
         let empty = &b""[..];
         assert_eq!(
-            object(b"[549 3.14 false (Ralph) /SomeName] "),
+            object(b"[549 3.14 false (Ralph) /SomeName]"),
             Ok((
                 empty,
                 Object::Array(Array::from([
@@ -402,7 +411,7 @@ mod tests {
     pub fn test_indirect_object() {
         let empty = &b""[..];
         assert_eq!(
-            object("0 0 obj null endobj ".as_bytes()),
+            object(b"0 0 obj null endobj"),
             Ok((
                 empty,
                 Object::IndirectObject(IndirectObject {
@@ -412,6 +421,32 @@ mod tests {
                 })
             ))
         );
+        assert_eq!(
+            object(
+                b"1 0 obj
+            << /Type /Catalog
+               /Pages 2 0 R
+            >>
+            endobj"
+            ),
+            Ok((
+                empty,
+                Object::IndirectObject(IndirectObject {
+                    index: 1,
+                    generation: 0,
+                    object: Box::new(Object::Dictionary(Dictionary::from([
+                        (
+                            b"Pages".to_vec(),
+                            Object::Reference(Reference {
+                                index: 2,
+                                generation: 0
+                            })
+                        ),
+                        (b"Type".to_vec(), Object::Name(b"Catalog".to_vec()))
+                    ])))
+                })
+            ))
+        )
     }
 
     #[test]
@@ -426,6 +461,45 @@ mod tests {
                     generation: 0,
                 })
             ))
+        );
+    }
+
+    #[test]
+    pub fn test_object0() {
+        let parsed_obj = object0(
+            b"     1 0 obj
+        << /Type /Catalog
+           /Pages 2 0 R
+        >>
+        endobj
+        2 0 obj
+        << /Kids [3 0 R]
+           /Type /Pages
+           /Count 1
+        >>
+        endobj
+        3 0 obj
+        << /Contents 4 0 R
+           /Type /Page
+           /Resources << /XObject << /Im0 5 0 R >> >>
+           /Parent 2 0 R
+           /MediaBox [0 0 180 240]
+        >>
+        endobj",
+        )
+        .unwrap()
+        .1;
+        assert!(
+            matches!(
+                &parsed_obj[..],
+                [
+                    Object::IndirectObject(_),
+                    Object::IndirectObject(_),
+                    Object::IndirectObject(_),
+                ]
+            ),
+            "Unexpected parsing result: {:#?}",
+            parsed_obj
         );
     }
 }
