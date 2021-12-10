@@ -324,17 +324,17 @@ mod tests {
 
     #[test]
     pub fn test_name_object() {
-        assert!(object(b"/Name1 ").is_ok());
-        assert!(object(b"/ASomewhatLongerName ").is_ok());
-        assert!(object(b"/A;Name_With-Various***Characters? ").is_ok());
-        assert!(object(b"/1.2 ").is_ok());
-        assert!(object(b"/$$ ").is_ok());
-        assert!(object(b"/@pattern ").is_ok());
-        assert!(object(b"/.notdef ").is_ok());
-        assert!(object(b"/lime#20Green ").is_ok());
-        assert!(object(b"/paired#28#29parentheses ").is_ok());
-        assert!(object(b"/The_Key_of_F#23_Minor ").is_ok());
-        assert!(object(b"/A#42 ").is_ok());
+        assert!(object(b"/Name1").is_ok());
+        assert!(object(b"/ASomewhatLongerName").is_ok());
+        assert!(object(b"/A;Name_With-Various***Characters?").is_ok());
+        assert!(object(b"/1.2").is_ok());
+        assert!(object(b"/$$").is_ok());
+        assert!(object(b"/@pattern").is_ok());
+        assert!(object(b"/.notdef").is_ok());
+        assert!(object(b"/lime#20Green").is_ok());
+        assert!(object(b"/paired#28#29parentheses").is_ok());
+        assert!(object(b"/The_Key_of_F#23_Minor").is_ok());
+        assert!(object(b"/A#42").is_ok());
     }
 
     #[test]
@@ -342,7 +342,7 @@ mod tests {
         let empty = &b""[..];
 
         let obj = Object::Dictionary(HashMap::from([(b"Length".to_vec(), Object::Integer(93))]));
-        assert_eq!(object(b"<< /Length 93 >> "), Ok((empty, obj)));
+        assert_eq!(object(b"<< /Length 93 >>"), Ok((empty, obj)));
 
         let obj = Object::Dictionary(HashMap::from([
             (b"Type".to_vec(), Object::Name(b"Example".to_vec())),
@@ -396,13 +396,13 @@ mod tests {
                 ]))
             ))
         );
-        assert_eq!(object(b"[] "), Ok((empty, Object::Array(Array::from([])))));
+        assert_eq!(object(b"[]"), Ok((empty, Object::Array(Array::from([])))));
         assert_eq!(
-            object(b"[459] "),
+            object(b"[459]"),
             Ok((empty, Object::Array(Array::from([Object::Integer(459),]))))
         );
         assert_eq!(
-            object(b"[false] "),
+            object(b"[false]"),
             Ok((empty, Object::Array(Array::from([Object::Bool(false),]))))
         );
     }
@@ -453,7 +453,7 @@ mod tests {
     pub fn test_reference_object() {
         let empty = &b""[..];
         assert_eq!(
-            object("0 0 R ".as_bytes()),
+            object("0 0 R".as_bytes()),
             Ok((
                 empty,
                 Object::Reference(Reference {
