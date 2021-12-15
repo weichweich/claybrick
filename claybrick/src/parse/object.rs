@@ -1,4 +1,11 @@
-use nom::{branch, bytes, character, combinator, multi, number, sequence, IResult};
+use nom::{
+    branch,
+    bytes::{self, complete::take},
+    character,
+    combinator::{self, into},
+    error::Error,
+    multi, number, sequence, AsBytes, IResult,
+};
 
 use crate::pdf::{Array, Dictionary, IndirectObject, Name, Object, Reference};
 
@@ -109,28 +116,24 @@ pub(crate) fn null_object(input: &[u8]) -> IResult<&[u8], Object> {
     Ok((remainder, Object::Null))
 }
 
-pub(crate) fn name(input: &[u8]) -> IResult<&[u8], Name> {
+pub(crate) fn name_object(input: &[u8]) -> IResult<&[u8], Name> {
     let (remainder, _) = character::complete::char('/')(input)?;
     let (remainder, name) = bytes::complete::take_while(is_regular)(remainder)?;
     let (remainder, _) = require_termination(remainder)?;
 
     // TODO: parse name and replace all #XX with char
 
-    Ok((remainder, name.to_vec()))
-}
-
-pub(crate) fn name_object(input: &[u8]) -> IResult<&[u8], Object> {
-    combinator::map(name, Object::from)(input)
+    Ok((remainder, name.to_vec().into()))
 }
 
 pub(crate) fn dictionary_entry(input: &[u8]) -> IResult<&[u8], (Name, Object)> {
-    let (remainder, name) = name(input)?;
+    let (remainder, name) = name_object(input)?;
     let (remainder, obj) = object(remainder)?;
 
     Ok((remainder, (name, obj)))
 }
 
-pub(crate) fn dictionary_object(input: &[u8]) -> IResult<&[u8], Object> {
+pub(crate) fn dictionary_object(input: &[u8]) -> IResult<&[u8], Dictionary> {
     let (remainder, map) = sequence::delimited(
         sequence::terminated(
             bytes::complete::tag(b"<<"),
@@ -143,10 +146,10 @@ pub(crate) fn dictionary_object(input: &[u8]) -> IResult<&[u8], Object> {
         sequence::terminated(bytes::complete::tag(b">>"), require_termination),
     )(input)?;
 
-    Ok((remainder, Object::Dictionary(map)))
+    Ok((remainder, map))
 }
 
-pub fn array_object(input: &[u8]) -> IResult<&[u8], Object> {
+pub fn array_object(input: &[u8]) -> IResult<&[u8], Array> {
     let (remainder, array) = sequence::delimited(
         character::complete::char('['),
         multi::fold_many0(object, Array::new, |mut acc, obj| {
@@ -156,7 +159,31 @@ pub fn array_object(input: &[u8]) -> IResult<&[u8], Object> {
         sequence::terminated(character::complete::char(']'), require_termination),
     )(input)?;
 
-    Ok((remainder, Object::Array(array)))
+    Ok((remainder, array))
+}
+
+pub fn stream_object(input: &[u8]) -> IResult<&[u8], Object> {
+    let (remainder, dict) = dictionary_object(input)?;
+
+    let (remainder, _) = bytes::complete::tag(b"stream")(remainder)?;
+    let (remainder, _) = require_termination(remainder)?;
+
+    let length = match dict.get(&b"Length".to_vec().into()) {
+        Some(Object::Integer(length)) => *length,
+        err => {
+            println!("Err got {:?} as length (dict: {:?}", err, dict);
+            todo!()
+        }
+    };
+
+    let (remainder, data) =
+        combinator::map(take(usize::try_from(length).unwrap()), |b: &[u8]| {
+            b.to_vec()
+        })(remainder)?;
+    let (remainder, _) = bytes::complete::tag(b"endstream")(remainder)?;
+    let (remainder, _) = require_termination(remainder)?;
+
+    Ok((remainder, Object::Stream(dict, data)))
 }
 
 fn referred_object<'a>(
@@ -169,7 +196,7 @@ fn referred_object<'a>(
                 bytes::complete::tag(b"obj"),
                 character::complete::multispace1,
             ),
-            object,
+            branch::alt((stream_object, object)),
             sequence::terminated(bytes::complete::tag(b"endobj"), require_termination),
         ),
         move |obj| {
@@ -212,8 +239,8 @@ pub(crate) fn indirect_object(input: &[u8]) -> IResult<&[u8], Object> {
 pub(crate) fn object(input: &[u8]) -> IResult<&[u8], Object> {
     // The order is important!
     branch::alt((
-        dictionary_object,
-        array_object,
+        into(dictionary_object),
+        into(array_object),
         string_object,
         // indirect object has to be tested before we try to parse an integer.
         // `0 0 R` is an inderect object while `0 0` are two integers.
@@ -221,7 +248,7 @@ pub(crate) fn object(input: &[u8]) -> IResult<&[u8], Object> {
         number_object,
         bool_object,
         null_object,
-        name_object,
+        into(name_object),
     ))(input)
 }
 
@@ -341,26 +368,32 @@ mod tests {
     pub fn test_dictionary() {
         let empty = &b""[..];
 
-        let obj = Object::Dictionary(HashMap::from([(b"Length".to_vec(), Object::Integer(93))]));
+        let obj = Object::Dictionary(HashMap::from([(
+            b"Length".to_vec().into(),
+            Object::Integer(93),
+        )]));
         assert_eq!(object(b"<< /Length 93 >>"), Ok((empty, obj)));
 
         let obj = Object::Dictionary(HashMap::from([
-            (b"Type".to_vec(), Object::Name(b"Example".to_vec())),
             (
-                b"Subtype".to_vec(),
-                Object::Name(b"DictionaryExample".to_vec()),
-            ),
-            (b"Version".to_vec(), Object::Float(0.01)),
-            (b"IntegerItem".to_vec(), Object::Integer(12)),
-            (
-                b"StringItem".to_vec(),
-                Object::String("a string".to_owned()),
+                b"Type".to_vec().into(),
+                Object::Name(b"Example".to_vec().into()),
             ),
             (
-                b"Subdictionary".to_vec(),
+                b"Subtype".to_vec().into(),
+                Object::Name(b"DictionaryExample".to_vec().into()),
+            ),
+            (b"Version".to_vec().into(), Object::Float(0.01)),
+            (b"IntegerItem".to_vec().into(), Object::Integer(12)),
+            (
+                b"StringItem".to_vec().into(),
+                Object::String("a string".to_string()),
+            ),
+            (
+                b"Subdictionary".to_vec().into(),
                 Object::Dictionary(HashMap::from([
-                    (b"Item2".to_vec(), Object::Bool(true)),
-                    (b"Item2".to_vec(), Object::Bool(true)),
+                    (b"Item2".to_vec().into(), Object::Bool(true)),
+                    (b"Item2".to_vec().into(), Object::Bool(true)),
                 ])),
             ),
         ]));
@@ -462,6 +495,21 @@ mod tests {
                 })
             ))
         );
+    }
+
+    #[test]
+    pub fn test_stream() {
+        let stream = stream_object(
+            b"<< /Length 93 >>
+stream
+/DeviceRGB cs /DeviceRGB CS
+0 0 0.972549 SC
+21.68 194 136.64 26 re
+10 10 m 20 20 l S
+/Im0 Do
+endstream",
+        );
+        assert!(matches!(stream, Ok(_)), "Expected OK got: {:?}", stream);
     }
 
     #[test]

@@ -76,18 +76,18 @@ mod tests {
         assert_eq!(
             parse(
                 "%PDF-1.7
-                %\x01\x01\x01\x01\x01
-                1 0 obj
-                << /Type /Catalog
-                   /Pages 2 0 R
-                >>
-                endobj
-                2 0 obj
-                << /Kids [3 0 R]
-                   /Type /Pages
-                   /Count 1
-                >>
-                endobj".as_bytes()
+%\x01\x01\x01\x01\x01
+1 0 obj
+<< /Type /Catalog
+   /Pages 2 0 R
+>>
+endobj
+2 0 obj
+<< /Kids [3 0 R]
+   /Type /Pages
+   /Count 1
+>>
+endobj".as_bytes()
             ),
             Ok((
                 empty,
