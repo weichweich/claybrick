@@ -1,15 +1,21 @@
 [package]
+edition = "2021"
 name = "claybrick"
 version = "0.1.0"
-edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 nom = "7.1.0"
+nom-tracable = "0.8"
+nom_locate = "4.0"
 
 [dev-dependencies]
 structopt = "0.3"
+
+[features]
+default = []
+trace = ["nom-tracable/trace"]
 
 [[example]]
 name = "read_file"

@@ -1,3 +1,4 @@
+use nom_tracable::histogram;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -14,6 +15,8 @@ pub fn main() {
     let opt = Opt::from_args();
 
     let pdf = claybrick::read_file(opt.input.as_path()).unwrap();
+
+    histogram();
 
     println!("{:#?}", pdf);
 }
