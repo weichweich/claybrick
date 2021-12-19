@@ -7,7 +7,7 @@ mod parse;
 mod pdf;
 
 /// Read a PDF file and return the parsed `Pdf`.
-/// 
+///
 /// Panics if the file cannot be read or the PDF cannot get parsed.
 /// TODO: don't panic.
 pub fn read_file(file_path: &std::path::Path) -> Result<Pdf, ()> {

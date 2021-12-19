@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, ops::Deref};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pdf {
@@ -83,6 +83,14 @@ pub struct Name(Vec<u8>);
 impl From<Vec<u8>> for Name {
     fn from(v: Vec<u8>) -> Self {
         Name(v)
+    }
+}
+
+impl Deref for Name {
+    type Target = Vec<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 

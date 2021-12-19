@@ -1,4 +1,4 @@
-use nom::{bytes, character, sequence, IResult};
+use nom::{bytes, character, IResult};
 
 use crate::pdf::Pdf;
 
@@ -17,10 +17,9 @@ fn version(input: &[u8]) -> IResult<&[u8], (u8, u8)> {
 
 fn comment(input: &[u8]) -> IResult<&[u8], &[u8]> {
     let (remainder, _) = character::complete::multispace0(input)?;
-    let (remainder, (_, comment)) = sequence::pair(
-        character::complete::char('%'),
-        character::complete::not_line_ending,
-    )(remainder)?;
+    let (remainder, _) = character::complete::char('%')(remainder)?;
+    let (remainder, comment) = character::complete::not_line_ending(remainder)?;
+    let (remainder, _) = character::complete::line_ending(remainder)?;
 
     Ok((remainder, comment))
 }
@@ -60,14 +59,8 @@ mod tests {
     fn test_parse_version() {
         let empty = &[0u8; 0][..];
         assert_eq!(Ok((empty, (1, 8))), version("%PDF-1.8".as_bytes()));
-        assert_eq!(
-            Ok((empty, (1, 8))),
-            version("   \t\n   %PDF-1.8".as_bytes())
-        );
-        assert_eq!(
-            Ok((empty, (1, 8))),
-            version("   \t\n   %PDF-1.8 \t   ".as_bytes())
-        );
+        assert_eq!(Ok((empty, (1, 8))), version("   \t\n   %PDF-1.8".as_bytes()));
+        assert_eq!(Ok((empty, (1, 8))), version("   \t\n   %PDF-1.8 \t   ".as_bytes()));
     }
 
     #[test]
@@ -87,7 +80,8 @@ endobj
    /Type /Pages
    /Count 1
 >>
-endobj".as_bytes()
+endobj"
+                    .as_bytes()
             ),
             Ok((
                 empty,

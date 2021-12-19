@@ -3,20 +3,19 @@ use nom::{
     bytes::{self, complete::take},
     character,
     combinator::{self, into},
-    error::Error,
-    multi, number, sequence, AsBytes, IResult,
+    multi, number, sequence, IResult,
 };
 
-use crate::pdf::{Array, Dictionary, IndirectObject, Name, Object, Reference};
+use crate::{
+    parse::comment,
+    pdf::{Array, Dictionary, IndirectObject, Name, Object, Reference},
+};
 
 const TRUE_OBJECT: &str = "true";
 const FALSE_OBJECT: &str = "false";
 
 fn is_delimiter(chr: u8) -> bool {
-    matches!(
-        chr,
-        b'(' | b')' | b'<' | b'>' | b'[' | b']' | b'{' | b'}' | b'/' | b'%'
-    )
+    matches!(chr, b'(' | b')' | b'<' | b'>' | b'[' | b']' | b'{' | b'}' | b'/' | b'%')
 }
 
 fn is_regular(chr: u8) -> bool {
@@ -28,7 +27,8 @@ fn is_regular(chr: u8) -> bool {
 fn require_termination(input: &[u8]) -> IResult<&[u8], ()> {
     let (remainder, whitespace) = character::complete::multispace0(input)?;
     if whitespace.is_empty() && !input.is_empty() {
-        // TODO: there has to be a better way to require one char that fullfils a condition?
+        // TODO: there has to be a better way to require one char that fullfils a
+        // condition?
         bytes::complete::take_while_m_n(1, 1, is_delimiter)(remainder)?;
     }
     Ok((remainder, ()))
@@ -79,10 +79,7 @@ pub(crate) fn string_object(input: &[u8]) -> IResult<&[u8], Object> {
 
     let (remainder, _) = character::complete::multispace0(remainder)?;
 
-    Ok((
-        remainder,
-        Object::String(String::from_utf8(content.to_vec()).unwrap()),
-    ))
+    Ok((remainder, Object::String(String::from_utf8(content.to_vec()).unwrap())))
 }
 
 pub(crate) fn bool_object(input: &[u8]) -> IResult<&[u8], Object> {
@@ -97,6 +94,7 @@ pub(crate) fn bool_object(input: &[u8]) -> IResult<&[u8], Object> {
 }
 
 pub(crate) fn number_object(input: &[u8]) -> IResult<&[u8], Object> {
+    // TODO: accept optional `+` sign
     branch::alt((
         combinator::map(
             sequence::terminated(character::complete::i32, require_termination),
@@ -129,16 +127,15 @@ pub(crate) fn name_object(input: &[u8]) -> IResult<&[u8], Name> {
 pub(crate) fn dictionary_entry(input: &[u8]) -> IResult<&[u8], (Name, Object)> {
     let (remainder, name) = name_object(input)?;
     let (remainder, obj) = object(remainder)?;
+    let (remainder, _) = multi::many0(comment)(remainder)?;
+    let (remainder, _) = character::complete::multispace0(remainder)?;
 
     Ok((remainder, (name, obj)))
 }
 
 pub(crate) fn dictionary_object(input: &[u8]) -> IResult<&[u8], Dictionary> {
     let (remainder, map) = sequence::delimited(
-        sequence::terminated(
-            bytes::complete::tag(b"<<"),
-            character::complete::multispace1,
-        ),
+        sequence::terminated(bytes::complete::tag(b"<<"), character::complete::multispace1),
         multi::fold_many0(dictionary_entry, Dictionary::new, |mut acc, (name, obj)| {
             acc.insert(name, obj);
             acc
@@ -176,26 +173,17 @@ pub fn stream_object(input: &[u8]) -> IResult<&[u8], Object> {
         }
     };
 
-    let (remainder, data) =
-        combinator::map(take(usize::try_from(length).unwrap()), |b: &[u8]| {
-            b.to_vec()
-        })(remainder)?;
+    let (remainder, data) = combinator::map(take(usize::try_from(length).unwrap()), |b: &[u8]| b.to_vec())(remainder)?;
     let (remainder, _) = bytes::complete::tag(b"endstream")(remainder)?;
     let (remainder, _) = require_termination(remainder)?;
 
     Ok((remainder, Object::Stream(dict, data)))
 }
 
-fn referred_object<'a>(
-    index: u32,
-    generation: u32,
-) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Object> {
+fn referred_object<'a>(index: u32, generation: u32) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Object> {
     combinator::map(
         sequence::delimited(
-            sequence::terminated(
-                bytes::complete::tag(b"obj"),
-                character::complete::multispace1,
-            ),
+            sequence::terminated(bytes::complete::tag(b"obj"), character::complete::multispace1),
             branch::alt((stream_object, object)),
             sequence::terminated(bytes::complete::tag(b"endobj"), require_termination),
         ),
@@ -209,10 +197,7 @@ fn referred_object<'a>(
     )
 }
 
-fn reference_object<'a>(
-    index: u32,
-    generation: u32,
-) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Object> {
+fn reference_object<'a>(index: u32, generation: u32) -> impl FnMut(&'a [u8]) -> IResult<&'a [u8], Object> {
     combinator::map(
         sequence::terminated(character::complete::char('R'), require_termination),
         move |_| {
@@ -230,10 +215,7 @@ pub(crate) fn indirect_object(input: &[u8]) -> IResult<&[u8], Object> {
     let (remainder, generation) = character::complete::u32(remainder)?;
     let (remainder, _) = character::complete::multispace1(remainder)?;
 
-    branch::alt((
-        reference_object(index, generation),
-        referred_object(index, generation),
-    ))(remainder)
+    branch::alt((reference_object(index, generation), referred_object(index, generation)))(remainder)
 }
 
 pub(crate) fn object(input: &[u8]) -> IResult<&[u8], Object> {
@@ -260,6 +242,8 @@ pub(crate) fn object0(input: &[u8]) -> IResult<&[u8], Vec<Object>> {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+
+    use nom::AsBytes;
 
     use crate::pdf::Reference;
 
@@ -294,6 +278,10 @@ mod tests {
         let empty = &b""[..];
         assert_eq!(object(b"true "), Ok((empty, Object::Bool(true))));
         assert_eq!(object(b"false "), Ok((empty, Object::Bool(false))));
+        assert_eq!(
+            object(b"false%a-comment"),
+            Ok((b"%a-comment".as_bytes(), Object::Bool(false)))
+        );
         assert!(object(b"falsee").is_err());
         assert!(object(b"afalse").is_err());
     }
@@ -301,8 +289,13 @@ mod tests {
     #[test]
     pub fn test_integer_object() {
         let empty = &b""[..];
-        assert_eq!(object(b"123 "), Ok((empty, Object::Integer(123))));
-        assert_eq!(object(b"-123 "), Ok((empty, Object::Integer(-123))));
+        assert_eq!(object(b"123"), Ok((empty, Object::Integer(123))));
+        assert_eq!(object(b"-123"), Ok((empty, Object::Integer(-123))));
+        assert_eq!(object(b"+123"), Ok((empty, Object::Integer(123))));
+        assert_eq!(
+            object(b"-123%a-comment"),
+            Ok((b"%a-comment".as_bytes(), Object::Integer(-123)))
+        );
     }
 
     #[test]
@@ -310,6 +303,10 @@ mod tests {
         let empty = &b""[..];
         assert_eq!(object(b"123.123 "), Ok((empty, Object::Float(123.123))));
         assert_eq!(object(b"-123.123 "), Ok((empty, Object::Float(-123.123))));
+        assert_eq!(
+            object(b"-123.123%a-comment"),
+            Ok((b"%a-comment".as_bytes(), Object::Float(-123.123)))
+        );
         assert!(object(b"d123.123 ").is_err());
         assert!(object(b"-1c23.123 ").is_err());
     }
@@ -317,14 +314,8 @@ mod tests {
     #[test]
     pub fn test_string_object() {
         let empty = &b""[..];
-        assert_eq!(
-            object("()\n".as_bytes()),
-            Ok((empty, Object::String("".to_owned())))
-        );
-        assert_eq!(
-            object("(a) ".as_bytes()),
-            Ok((empty, Object::String("a".to_owned())))
-        );
+        assert_eq!(object("()\n".as_bytes()), Ok((empty, Object::String("".to_owned()))));
+        assert_eq!(object("(a) ".as_bytes()), Ok((empty, Object::String("a".to_owned()))));
         assert_eq!(
             object("((a)) ".as_bytes()),
             Ok((empty, Object::String("(a)".to_owned())))
@@ -368,27 +359,18 @@ mod tests {
     pub fn test_dictionary() {
         let empty = &b""[..];
 
-        let obj = Object::Dictionary(HashMap::from([(
-            b"Length".to_vec().into(),
-            Object::Integer(93),
-        )]));
+        let obj = Object::Dictionary(HashMap::from([(b"Length".to_vec().into(), Object::Integer(93))]));
         assert_eq!(object(b"<< /Length 93 >>"), Ok((empty, obj)));
 
         let obj = Object::Dictionary(HashMap::from([
-            (
-                b"Type".to_vec().into(),
-                Object::Name(b"Example".to_vec().into()),
-            ),
+            (b"Type".to_vec().into(), Object::Name(b"Example".to_vec().into())),
             (
                 b"Subtype".to_vec().into(),
                 Object::Name(b"DictionaryExample".to_vec().into()),
             ),
             (b"Version".to_vec().into(), Object::Float(0.01)),
             (b"IntegerItem".to_vec().into(), Object::Integer(12)),
-            (
-                b"StringItem".to_vec().into(),
-                Object::String("a string".to_string()),
-            ),
+            (b"StringItem".to_vec().into(), Object::String("a string".to_string())),
             (
                 b"Subdictionary".to_vec().into(),
                 Object::Dictionary(HashMap::from([
@@ -401,7 +383,7 @@ mod tests {
             object(
                 b"<< /Type /Example
         /Subtype /DictionaryExample
-        /Version 0.01
+        /Version 0.01%A COMMENT
         /IntegerItem 12
         /StringItem (a string)
         /Subdictionary <<
@@ -425,7 +407,7 @@ mod tests {
                     Object::Float(3.14),
                     Object::Bool(false),
                     Object::String("Ralph".to_string()),
-                    Object::Name(b"SomeName".to_vec())
+                    Object::Name(b"SomeName".to_vec().into())
                 ]))
             ))
         );
@@ -469,13 +451,13 @@ mod tests {
                     generation: 0,
                     object: Box::new(Object::Dictionary(Dictionary::from([
                         (
-                            b"Pages".to_vec(),
+                            b"Pages".to_vec().into(),
                             Object::Reference(Reference {
                                 index: 2,
                                 generation: 0
                             })
                         ),
-                        (b"Type".to_vec(), Object::Name(b"Catalog".to_vec()))
+                        (b"Type".to_vec().into(), Object::Name(b"Catalog".to_vec().into()))
                     ])))
                 })
             ))
