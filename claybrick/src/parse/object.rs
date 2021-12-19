@@ -76,7 +76,6 @@ pub(crate) fn string_object(input: &[u8]) -> IResult<&[u8], Object> {
         combinator::recognize(consume_string_content),
         character::complete::char(')'),
     )(input)?;
-
     let (remainder, _) = character::complete::multispace0(remainder)?;
 
     Ok((remainder, Object::String(String::from_utf8(content.to_vec()).unwrap())))
@@ -128,7 +127,6 @@ pub(crate) fn dictionary_entry(input: &[u8]) -> IResult<&[u8], (Name, Object)> {
     let (remainder, name) = name_object(input)?;
     let (remainder, obj) = object(remainder)?;
     let (remainder, _) = multi::many0(comment)(remainder)?;
-    let (remainder, _) = character::complete::multispace0(remainder)?;
 
     Ok((remainder, (name, obj)))
 }
