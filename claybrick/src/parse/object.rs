@@ -74,6 +74,42 @@ fn consume_string_content(input: Span) -> IResult<Span, ()> {
     Ok((remainder, ()))
 }
 
+fn hex_char_to_nibble(c: u8) -> u8 {
+    match c {
+        b'a'..=b'f' => c - b'a' + 10,
+        b'A'..=b'F' => c - b'A' + 10,
+        b'0'..=b'9' => c - b'0',
+        _ => unreachable!(),
+    }
+}
+
+fn unchecked_hex_decode(input: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(input.len() / 2 + input.len() % 2);
+    for s in input.chunks_exact(2) {
+        out.push((hex_char_to_nibble(s[0]) << 4) + hex_char_to_nibble(s[1]));
+    }
+
+    // if there is a remainder the last nibble is zero
+    if let Some(&r) = input.chunks_exact(2).remainder().get(0) {
+        out.push(r << 4);
+    }
+
+    out
+}
+
+#[tracable_parser]
+pub(crate) fn hex_string_object(input: Span) -> IResult<Span, Object> {
+    let (remainder, content) = sequence::delimited(
+        character::complete::char('<'),
+        character::complete::hex_digit1,
+        character::complete::char('>'),
+    )(input)?;
+
+    let bytes = unchecked_hex_decode(content.fragment());
+
+    Ok((remainder, Object::HexString(bytes)))
+}
+
 #[tracable_parser]
 pub(crate) fn string_object(input: Span) -> IResult<Span, Object> {
     let (remainder, content) = sequence::delimited(
@@ -210,12 +246,7 @@ fn referred_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> I
 fn reference_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, Object> {
     combinator::map(
         sequence::terminated(character::complete::char('R'), require_termination),
-        move |_| {
-            Object::Reference(Reference {
-                index,
-                generation,
-            })
-        },
+        move |_| Object::Reference(Reference { index, generation }),
     )
 }
 
@@ -242,6 +273,7 @@ pub(crate) fn object(input: Span) -> IResult<Span, Object> {
         number_object,
         bool_object,
         null_object,
+        hex_string_object,
         into(name_object),
     ))(input)
 }
@@ -359,6 +391,30 @@ mod tests {
             object(b"(123\\nmnbvcx)\n".as_bytes().into()).unwrap().1,
             Object::String("123\\nmnbvcx".to_owned())
         );
+    }
+
+    #[test]
+    fn test_hex_to_nibble() {
+        assert_eq!(hex_char_to_nibble(b'f'), 15);
+        assert_eq!(hex_char_to_nibble(b'F'), 15);
+        assert_eq!(hex_char_to_nibble(b'0'), 0);
+        assert_eq!(hex_char_to_nibble(b'5'), 5);
+    }
+
+    #[test]
+    pub fn test_unchecked_hex_decode() {
+        assert_eq!(
+            unchecked_hex_decode(b"FFFFFFFFFFFF".as_bytes()),
+            b"\xFF\xFF\xFF\xFF\xFF\xFF".to_vec()
+        )
+    }
+
+    #[test]
+    pub fn test_hex_string_object() {
+        assert_eq!(
+            object(b"<FFFFFFFFFFFF>".as_bytes().into()).unwrap().1,
+            Object::HexString(b"\xFF\xFF\xFF\xFF\xFF\xFF".to_vec())
+        )
     }
 
     #[test]
@@ -548,11 +604,7 @@ endstream"
         assert!(
             matches!(
                 &parsed_obj[..],
-                [
-                    Object::Indirect(_),
-                    Object::Indirect(_),
-                    Object::Indirect(_),
-                ]
+                [Object::Indirect(_), Object::Indirect(_), Object::Indirect(_),]
             ),
             "Unexpected parsing result: {:#?}",
             parsed_obj

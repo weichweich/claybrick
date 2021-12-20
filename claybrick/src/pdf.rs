@@ -10,6 +10,7 @@ pub struct Pdf {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Object {
     String(String),
+    HexString(Vec<u8>),
     Float(f32),
     Integer(i32),
     Bool(bool),
