@@ -18,7 +18,7 @@ pub enum Object {
     Dictionary(Dictionary),
     Stream(Dictionary, Vec<u8>),
     Null,
-    IndirectObject(IndirectObject),
+    Indirect(IndirectObject),
     Reference(Reference),
 }
 

@@ -198,9 +198,9 @@ fn referred_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> I
             sequence::terminated(bytes::complete::tag(b"endobj"), require_termination),
         ),
         move |obj| {
-            Object::IndirectObject(IndirectObject {
-                index: index,
-                generation: generation,
+            Object::Indirect(IndirectObject {
+                index,
+                generation,
                 object: Box::new(obj),
             })
         },
@@ -212,8 +212,8 @@ fn reference_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> 
         sequence::terminated(character::complete::char('R'), require_termination),
         move |_| {
             Object::Reference(Reference {
-                index: index,
-                generation: generation,
+                index,
+                generation,
             })
         },
     )
@@ -455,7 +455,7 @@ mod tests {
     pub fn test_indirect_object() {
         assert_eq!(
             object(b"0 0 obj null endobj".as_bytes().into()).unwrap().1,
-            Object::IndirectObject(IndirectObject {
+            Object::Indirect(IndirectObject {
                 index: 0,
                 generation: 0,
                 object: Box::new(Object::Null)
@@ -473,7 +473,7 @@ mod tests {
             )
             .unwrap()
             .1,
-            Object::IndirectObject(IndirectObject {
+            Object::Indirect(IndirectObject {
                 index: 1,
                 generation: 0,
                 object: Box::new(Object::Dictionary(Dictionary::from([
@@ -549,9 +549,9 @@ endstream"
             matches!(
                 &parsed_obj[..],
                 [
-                    Object::IndirectObject(_),
-                    Object::IndirectObject(_),
-                    Object::IndirectObject(_),
+                    Object::Indirect(_),
+                    Object::Indirect(_),
+                    Object::Indirect(_),
                 ]
             ),
             "Unexpected parsing result: {:#?}",

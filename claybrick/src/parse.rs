@@ -33,7 +33,7 @@ fn comment(input: Span) -> IResult<Span, Span> {
 #[tracable_parser]
 fn binary_indicator(input: Span) -> IResult<Span, bool> {
     if let Ok((r, comment)) = comment(input) {
-        if comment.len() > 3 && comment.iter().find(|&d| *d < 128).is_none() {
+        if comment.len() > 3 && !comment.iter().any(|&d| d < 128) {
             Ok((r, true))
         } else {
             Ok((input, false))
@@ -65,7 +65,7 @@ mod tests {
     use nom::AsBytes;
 
     use super::*;
-    use crate::pdf::{Dictionary, IndirectObject, Name, Object, Reference};
+    use crate::pdf::{Dictionary, IndirectObject, Object, Reference};
 
     #[test]
     fn test_parse_version() {
@@ -110,7 +110,7 @@ mod tests {
                 version: (1, 7),
                 announced_binary: true,
                 objects: vec![
-                    Object::IndirectObject(IndirectObject {
+                    Object::Indirect(IndirectObject {
                         index: 1,
                         generation: 0,
                         object: Box::new(Object::Dictionary(Dictionary::from([
@@ -124,7 +124,7 @@ mod tests {
                             )
                         ])))
                     }),
-                    Object::IndirectObject(IndirectObject {
+                    Object::Indirect(IndirectObject {
                         index: 2,
                         generation: 0,
                         object: Box::new(Object::Dictionary(Dictionary::from([
