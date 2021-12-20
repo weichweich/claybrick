@@ -65,6 +65,7 @@ mod tests {
     use nom::AsBytes;
 
     use super::*;
+    use crate::pdf::{Dictionary, IndirectObject, Name, Object, Reference};
 
     #[test]
     fn test_parse_version() {
@@ -108,7 +109,37 @@ mod tests {
             Pdf {
                 version: (1, 7),
                 announced_binary: true,
-                objects: vec![]
+                objects: vec![
+                    Object::IndirectObject(IndirectObject {
+                        index: 1,
+                        generation: 0,
+                        object: Box::new(Object::Dictionary(Dictionary::from([
+                            (b"Type".to_vec().into(), Object::Name(b"Catalog".to_vec().into())),
+                            (
+                                b"Pages".to_vec().into(),
+                                Object::Reference(Reference {
+                                    index: 2,
+                                    generation: 0
+                                })
+                            )
+                        ])))
+                    }),
+                    Object::IndirectObject(IndirectObject {
+                        index: 2,
+                        generation: 0,
+                        object: Box::new(Object::Dictionary(Dictionary::from([
+                            (
+                                b"Kids".to_vec().into(),
+                                Object::Array(vec![Object::Reference(Reference {
+                                    index: 3,
+                                    generation: 0
+                                })])
+                            ),
+                            (b"Type".to_vec().into(), Object::Name(b"Pages".to_vec().into())),
+                            (b"Count".to_vec().into(), Object::Integer(1))
+                        ])))
+                    })
+                ]
             }
         )
     }
