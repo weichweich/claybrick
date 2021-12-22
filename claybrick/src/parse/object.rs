@@ -25,7 +25,6 @@ fn is_regular(chr: u8) -> bool {
 
 /// Consume all whitespace. If input doesn't start with a whitespace, peek the
 /// next char and require it to be a delimiter.
-#[tracable_parser]
 fn require_termination(input: Span) -> IResult<Span, ()> {
     let (remainder, whitespace) = character::complete::multispace0(input)?;
     if whitespace.is_empty() && !input.is_empty() {
@@ -179,13 +178,14 @@ pub(crate) fn dictionary_entry(input: Span) -> IResult<Span, (Name, Object)> {
 #[tracable_parser]
 pub(crate) fn dictionary_object(input: Span) -> IResult<Span, Dictionary> {
     let (remainder, map) = sequence::delimited(
-        sequence::terminated(bytes::complete::tag(b"<<"), character::complete::multispace1),
+        sequence::terminated(bytes::complete::tag(b"<<"), character::complete::multispace0),
         multi::fold_many0(dictionary_entry, Dictionary::new, |mut acc, (name, obj)| {
             acc.insert(name, obj);
             acc
         }),
-        sequence::terminated(bytes::complete::tag(b">>"), require_termination),
+        bytes::complete::tag(b">>"),
     )(input)?;
+    let (remainder, _) = character::complete::multispace0(remainder)?;
 
     Ok((remainder, map))
 }
@@ -193,7 +193,7 @@ pub(crate) fn dictionary_object(input: Span) -> IResult<Span, Dictionary> {
 #[tracable_parser]
 pub fn array_object(input: Span) -> IResult<Span, Array> {
     let (remainder, array) = sequence::delimited(
-        character::complete::char('['),
+        sequence::pair(character::complete::char('['), character::complete::multispace0),
         multi::fold_many0(object, Array::new, |mut acc, obj| {
             acc.push(obj);
             acc
@@ -214,7 +214,7 @@ pub fn stream_object(input: Span) -> IResult<Span, Object> {
     let length = match dict.get(&b"Length".to_vec().into()) {
         Some(Object::Integer(length)) => *length,
         err => {
-            println!("Err got {:?} as length (dict: {:?}", err, dict);
+            println!("Err got {:?} as length (dict: {:?})", err, dict);
             todo!()
         }
     };
@@ -229,7 +229,7 @@ pub fn stream_object(input: Span) -> IResult<Span, Object> {
 fn referred_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, Object> {
     combinator::map(
         sequence::delimited(
-            sequence::terminated(bytes::complete::tag(b"obj"), character::complete::multispace1),
+            sequence::terminated(bytes::complete::tag(b"obj"), character::complete::multispace0),
             branch::alt((stream_object, object)),
             sequence::terminated(bytes::complete::tag(b"endobj"), require_termination),
         ),
@@ -287,7 +287,6 @@ pub(crate) fn object0(input: Span) -> IResult<Span, Vec<Object>> {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-
     use nom::AsBytes;
 
     use crate::pdf::Reference;
@@ -605,6 +604,29 @@ endstream"
             matches!(
                 &parsed_obj[..],
                 [Object::Indirect(_), Object::Indirect(_), Object::Indirect(_),]
+            ),
+            "Unexpected parsing result: {:#?}",
+            parsed_obj
+        );
+    }
+
+    #[test]
+    fn test_object_00() {
+        let parsed_obj = object0(
+            b"8784 0 obj <</Linearized 1/L 6962693/O 8787/E 131293/N 768/T 6954970/H [ 2799 5432]>>\rendobj"
+                .as_bytes()
+                .into(),
+        )
+        .unwrap()
+        .1;
+        assert!(
+            matches!(
+                &parsed_obj[..],
+                [Object::Indirect(IndirectObject {
+                    index: 8784,
+                    generation: 0,
+                    object: _
+                })]
             ),
             "Unexpected parsing result: {:#?}",
             parsed_obj
