@@ -107,7 +107,7 @@ pub(crate) fn hex_string_object(input: Span) -> IResult<Span, Object> {
 
     let bytes = unchecked_hex_decode(content.fragment());
 
-    Ok((remainder, Object::HexString(bytes)))
+    Ok((remainder, Object::HexString(bytes.into())))
 }
 
 #[tracable_parser]
@@ -244,7 +244,7 @@ pub fn stream_object(input: Span) -> IResult<Span, Object> {
         stream_by_length(usize::try_from(length).unwrap(), remainder).or_else(|_| stream_by_keyword(remainder))?;
     // let (remainder, data) = stream_by_keyword(remainder)?;
 
-    Ok((remainder, Object::Stream(dict, data)))
+    Ok((remainder, Object::Stream(dict, data.into())))
 }
 
 fn referred_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, Object> {
@@ -433,7 +433,7 @@ mod tests {
     pub fn test_hex_string_object() {
         assert_eq!(
             object(b"<FFFFFFFFFFFF>".as_bytes().into()).unwrap().1,
-            Object::HexString(b"\xFF\xFF\xFF\xFF\xFF\xFF".to_vec())
+            Object::HexString(b"\xFF\xFF\xFF\xFF\xFF\xFF".to_vec().into())
         )
     }
 
@@ -505,7 +505,7 @@ mod tests {
             object(b"[549 3.14 false (Ralph) /SomeName]".as_bytes().into())
                 .unwrap()
                 .1,
-            Object::Array(Array::from([
+            Object::Array(Array::from(vec![
                 Object::Integer(549),
                 Object::Float(3.14),
                 Object::Bool(false),
@@ -515,15 +515,15 @@ mod tests {
         );
         assert_eq!(
             object(b"[]".as_bytes().into()).unwrap().1,
-            Object::Array(Array::from([]))
+            Object::Array(Array::new())
         );
         assert_eq!(
             object(b"[459]".as_bytes().into()).unwrap().1,
-            Object::Array(Array::from([Object::Integer(459)]))
+            Object::Array(Array::from(vec![Object::Integer(459)]))
         );
         assert_eq!(
             object(b"[false]".as_bytes().into()).unwrap().1,
-            Object::Array(Array::from([Object::Bool(false)]))
+            Object::Array(Array::from(vec![Object::Bool(false)]))
         );
     }
 

@@ -133,7 +133,7 @@ mod tests {
                                 Object::Array(vec![Object::Reference(Reference {
                                     index: 3,
                                     generation: 0
-                                })])
+                                })].into())
                             ),
                             (b"Type".to_vec().into(), Object::Name(b"Pages".to_vec().into())),
                             (b"Count".to_vec().into(), Object::Integer(1))
