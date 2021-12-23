@@ -1,8 +1,12 @@
-use std::{
-    collections::HashMap,
-    fmt::Display,
-    ops::{Deref, DerefMut},
-};
+use std::{collections::HashMap, fmt::Display, ops::Deref};
+
+pub use self::array::Array;
+pub use self::indirect::{IndirectObject, Reference};
+pub use self::name::Name;
+
+mod array;
+mod indirect;
+mod name;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pdf {
@@ -107,56 +111,6 @@ impl From<Dictionary> for Object {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct IndirectObject {
-    pub(crate) index: u32,
-    pub(crate) generation: u32,
-    pub(crate) object: Box<Object>,
-}
-
-impl Display for IndirectObject {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Indirect {} {} {{ {} }}", self.index, self.generation, self.object)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Reference {
-    pub(crate) index: u32,
-    pub(crate) generation: u32,
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Name(Vec<u8>);
-
-impl From<Vec<u8>> for Name {
-    fn from(v: Vec<u8>) -> Self {
-        Name(v)
-    }
-}
-
-impl Deref for Name {
-    type Target = Vec<u8>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Debug for Name {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Name")
-            .field(&String::from_utf8_lossy(&self.0[..]))
-            .finish()
-    }
-}
-
-impl std::fmt::Display for Name {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &String::from_utf8_lossy(&self.0[..]))
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Bytes(Vec<u8>);
 
@@ -182,43 +136,3 @@ impl std::fmt::Display for Bytes {
 }
 
 pub type Dictionary = HashMap<Name, Object>;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Array(Vec<Object>);
-
-impl Array {
-    pub fn new() -> Self {
-        Self(Vec::new())
-    }
-}
-
-impl Deref for Array {
-    type Target = Vec<Object>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Array {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl From<Vec<Object>> for Array {
-    fn from(objects: Vec<Object>) -> Self {
-        Self(objects)
-    }
-}
-
-impl std::fmt::Display for Array {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Array [")?;
-        for obj in self.iter() {
-            write!(f, "\n  {}", obj)?;
-        }
-        write!(f, "]")?;
-        Ok(())
-    }
-}
