@@ -391,27 +391,27 @@ mod tests {
     pub fn test_string_object() {
         assert_eq!(
             object(b"()\n".as_bytes().into()).unwrap().1,
-            Object::String("".to_owned())
+            Object::String(b"".to_vec().into())
         );
         assert_eq!(
             object(b"(a) ".as_bytes().into()).unwrap().1,
-            Object::String("a".to_owned())
+            Object::String(b"a".to_vec().into())
         );
         assert_eq!(
             object(b"((a)) ".as_bytes().into()).unwrap().1,
-            Object::String("(a)".to_owned())
+            Object::String(b"(a)".to_vec().into())
         );
         assert_eq!(
             object(br"((\(a)) ".as_bytes().into()).unwrap().1,
-            Object::String(r"(\(a)".to_owned())
+            Object::String(br"(\(a)".to_vec().into())
         );
         assert_eq!(
             object(br"(a\)\)\)) ".as_bytes().into()).unwrap().1,
-            Object::String(r"a\)\)\)".to_owned())
+            Object::String(br"a\)\)\)".to_vec().into())
         );
         assert_eq!(
             object(b"(123\\nmnbvcx)\n".as_bytes().into()).unwrap().1,
-            Object::String("123\\nmnbvcx".to_owned())
+            Object::String(b"123\\nmnbvcx".to_vec().into())
         );
     }
 
@@ -472,7 +472,10 @@ mod tests {
             ),
             (b"Version".to_vec().into(), Object::Float(0.01)),
             (b"IntegerItem".to_vec().into(), Object::Integer(12)),
-            (b"StringItem".to_vec().into(), Object::String("a string".to_string())),
+            (
+                b"StringItem".to_vec().into(),
+                Object::String(b"a string".to_vec().into()),
+            ),
             (
                 b"Subdictionary".to_vec().into(),
                 Object::Dictionary(HashMap::from([
@@ -511,14 +514,11 @@ mod tests {
                 Object::Integer(549),
                 Object::Float(3.14),
                 Object::Bool(false),
-                Object::String("Ralph".to_string()),
+                Object::String(b"Ralph".to_vec().into()),
                 Object::Name(b"SomeName".to_vec().into())
             ]))
         );
-        assert_eq!(
-            object(b"[]".as_bytes().into()).unwrap().1,
-            Object::Array(Array::new())
-        );
+        assert_eq!(object(b"[]".as_bytes().into()).unwrap().1, Object::Array(Array::new()));
         assert_eq!(
             object(b"[459]".as_bytes().into()).unwrap().1,
             Object::Array(Array::from(vec![Object::Integer(459)]))

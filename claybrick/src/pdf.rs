@@ -3,10 +3,12 @@ use std::{collections::HashMap, fmt::Display, ops::Deref};
 pub use self::array::Array;
 pub use self::indirect::{IndirectObject, Reference};
 pub use self::name::Name;
+pub use self::string::CbString;
 
 mod array;
 mod indirect;
 mod name;
+mod string;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pdf {
@@ -29,7 +31,7 @@ impl Display for Pdf {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Object {
-    String(String),
+    String(CbString),
     HexString(Bytes),
     Float(f32),
     Integer(i32),
@@ -81,8 +83,8 @@ impl From<f32> for Object {
     }
 }
 
-impl From<String> for Object {
-    fn from(v: String) -> Self {
+impl From<CbString> for Object {
+    fn from(v: CbString) -> Self {
         Self::String(v)
     }
 }
