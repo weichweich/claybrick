@@ -4,12 +4,14 @@ use nom_tracable::{tracable_parser, TracableInfo};
 
 use crate::pdf::Pdf;
 
+pub mod error;
 mod object;
 
 type Span<'a> = LocatedSpan<&'a [u8], TracableInfo>;
+type CbResult<'a, O> = IResult<Span<'a>, O, error::CbError<Span<'a>>>;
 
 #[tracable_parser]
-fn version(input: Span) -> IResult<Span, (u8, u8)> {
+fn version(input: Span) -> CbResult<(u8, u8)> {
     let (remainder, _) = bytes::complete::tag_no_case("%PDF-")(input)?;
     let (remainder, major) = character::complete::u8(remainder)?;
     let (remainder, _) = character::complete::char('.')(remainder)?;
@@ -20,7 +22,7 @@ fn version(input: Span) -> IResult<Span, (u8, u8)> {
 }
 
 #[tracable_parser]
-fn comment(input: Span) -> IResult<Span, Span> {
+fn comment(input: Span) -> CbResult<Span> {
     let (remainder, _) = character::complete::multispace0(input)?;
     let (remainder, _) = character::complete::char('%')(remainder)?;
     let (remainder, comment) = character::complete::not_line_ending(remainder)?;
@@ -31,7 +33,7 @@ fn comment(input: Span) -> IResult<Span, Span> {
 }
 
 #[tracable_parser]
-fn binary_indicator(input: Span) -> IResult<Span, bool> {
+fn binary_indicator(input: Span) -> CbResult<bool> {
     if let Ok((r, comment)) = comment(input) {
         if comment.len() > 3 && !comment.iter().any(|&d| d < 128) {
             Ok((r, true))
@@ -44,7 +46,7 @@ fn binary_indicator(input: Span) -> IResult<Span, bool> {
 }
 
 #[tracable_parser]
-pub(crate) fn parse(input: Span) -> IResult<Span, Pdf> {
+pub(crate) fn parse(input: Span) -> CbResult<Pdf> {
     let (remainder, _) = character::complete::multispace0(input)?;
     let (remainder, version) = version(remainder)?;
     let (remainder, announced_binary) = binary_indicator(remainder)?;
@@ -130,10 +132,13 @@ mod tests {
                         object: Box::new(Object::Dictionary(Dictionary::from([
                             (
                                 b"Kids".to_vec().into(),
-                                Object::Array(vec![Object::Reference(Reference {
-                                    index: 3,
-                                    generation: 0
-                                })].into())
+                                Object::Array(
+                                    vec![Object::Reference(Reference {
+                                        index: 3,
+                                        generation: 0
+                                    })]
+                                    .into()
+                                )
                             ),
                             (b"Type".to_vec().into(), Object::Name(b"Pages".to_vec().into())),
                             (b"Count".to_vec().into(), Object::Integer(1))

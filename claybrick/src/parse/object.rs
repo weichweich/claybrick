@@ -3,7 +3,7 @@ use nom::{
     bytes::{self, complete::take},
     character,
     combinator::{self, into},
-    multi, number, sequence, IResult,
+    multi, number, sequence,
 };
 use nom_tracable::tracable_parser;
 
@@ -11,6 +11,8 @@ use crate::{
     parse::{comment, Span},
     pdf::{Array, Dictionary, IndirectObject, Name, Object, Reference},
 };
+
+use super::CbResult;
 
 const TRUE_OBJECT: &str = "true";
 const FALSE_OBJECT: &str = "false";
@@ -26,7 +28,7 @@ fn is_regular(chr: u8) -> bool {
 /// Consume all whitespace. If input doesn't start with a whitespace, peek the
 /// next char and require it to be a delimiter.
 #[tracable_parser]
-fn require_termination(input: Span) -> IResult<Span, ()> {
+fn require_termination(input: Span) -> CbResult<()> {
     let (remainder, whitespace) = character::complete::multispace0(input)?;
     if whitespace.is_empty() && !input.is_empty() {
         // TODO: there has to be a better way to require one char that fullfils a
@@ -47,7 +49,7 @@ fn consume_until_parenthesis(input: Span) -> Span {
 }
 
 #[tracable_parser]
-fn consume_string_content(input: Span) -> IResult<Span, ()> {
+fn consume_string_content(input: Span) -> CbResult<()> {
     let mut open_parathesis = 0;
     let mut remainder = input;
 
@@ -98,7 +100,7 @@ fn unchecked_hex_decode(input: &[u8]) -> Vec<u8> {
 }
 
 #[tracable_parser]
-pub(crate) fn hex_string_object(input: Span) -> IResult<Span, Object> {
+pub(crate) fn hex_string_object(input: Span) -> CbResult<Object> {
     let (remainder, content) = sequence::delimited(
         character::complete::char('<'),
         character::complete::hex_digit1,
@@ -111,7 +113,7 @@ pub(crate) fn hex_string_object(input: Span) -> IResult<Span, Object> {
 }
 
 #[tracable_parser]
-pub(crate) fn string_object(input: Span) -> IResult<Span, Object> {
+pub(crate) fn string_object(input: Span) -> CbResult<Object> {
     let (remainder, content) = sequence::delimited(
         character::complete::char('('),
         combinator::recognize(consume_string_content),
@@ -119,11 +121,11 @@ pub(crate) fn string_object(input: Span) -> IResult<Span, Object> {
     )(input)?;
     let (remainder, _) = character::complete::multispace0(remainder)?;
 
-    Ok((remainder, Object::String(String::from_utf8(content.to_vec()).unwrap())))
+    Ok((remainder, Object::String(content.to_vec().into())))
 }
 
 #[tracable_parser]
-pub(crate) fn bool_object(input: Span) -> IResult<Span, Object> {
+pub(crate) fn bool_object(input: Span) -> CbResult<Object> {
     let (remainder, obj) = branch::alt((
         combinator::value(Object::Bool(true), bytes::complete::tag(TRUE_OBJECT)),
         combinator::value(Object::Bool(false), bytes::complete::tag(FALSE_OBJECT)),
@@ -135,7 +137,7 @@ pub(crate) fn bool_object(input: Span) -> IResult<Span, Object> {
 }
 
 #[tracable_parser]
-pub(crate) fn number_object(input: Span) -> IResult<Span, Object> {
+pub(crate) fn number_object(input: Span) -> CbResult<Object> {
     branch::alt((
         combinator::map(
             sequence::terminated(character::complete::i32, require_termination),
@@ -149,7 +151,7 @@ pub(crate) fn number_object(input: Span) -> IResult<Span, Object> {
 }
 
 #[tracable_parser]
-pub(crate) fn null_object(input: Span) -> IResult<Span, Object> {
+pub(crate) fn null_object(input: Span) -> CbResult<Object> {
     let (remainder, _) = bytes::complete::tag(b"null")(input)?;
     let (remainder, _) = require_termination(remainder)?;
 
@@ -157,7 +159,7 @@ pub(crate) fn null_object(input: Span) -> IResult<Span, Object> {
 }
 
 #[tracable_parser]
-pub(crate) fn name_object(input: Span) -> IResult<Span, Name> {
+pub(crate) fn name_object(input: Span) -> CbResult<Name> {
     let (remainder, _) = character::complete::char('/')(input)?;
     let (remainder, name) = bytes::complete::take_while(is_regular)(remainder)?;
     let (remainder, _) = require_termination(remainder)?;
@@ -168,7 +170,7 @@ pub(crate) fn name_object(input: Span) -> IResult<Span, Name> {
 }
 
 #[tracable_parser]
-pub(crate) fn dictionary_entry(input: Span) -> IResult<Span, (Name, Object)> {
+pub(crate) fn dictionary_entry(input: Span) -> CbResult<(Name, Object)> {
     let (remainder, name) = name_object(input)?;
     let (remainder, obj) = object(remainder)?;
     let (remainder, _) = multi::many0(comment)(remainder)?;
@@ -177,7 +179,7 @@ pub(crate) fn dictionary_entry(input: Span) -> IResult<Span, (Name, Object)> {
 }
 
 #[tracable_parser]
-pub(crate) fn dictionary_object(input: Span) -> IResult<Span, Dictionary> {
+pub(crate) fn dictionary_object(input: Span) -> CbResult<Dictionary> {
     let (remainder, map) = sequence::delimited(
         sequence::terminated(bytes::complete::tag(b"<<"), character::complete::multispace0),
         multi::fold_many0(dictionary_entry, Dictionary::new, |mut acc, (name, obj)| {
@@ -192,7 +194,7 @@ pub(crate) fn dictionary_object(input: Span) -> IResult<Span, Dictionary> {
 }
 
 #[tracable_parser]
-pub fn array_object(input: Span) -> IResult<Span, Array> {
+pub fn array_object(input: Span) -> CbResult<Array> {
     let (remainder, array) = sequence::delimited(
         sequence::pair(character::complete::char('['), character::complete::multispace0),
         multi::fold_many0(object, Array::new, |mut acc, obj| {
@@ -205,7 +207,7 @@ pub fn array_object(input: Span) -> IResult<Span, Array> {
     Ok((remainder, array))
 }
 
-fn stream_by_length(length: usize, input: Span) -> IResult<Span, Vec<u8>> {
+fn stream_by_length(length: usize, input: Span) -> CbResult<Vec<u8>> {
     let (remainder, data) = combinator::map(take(length), |b: Span| b.to_vec())(input)?;
     let (remainder, _) = bytes::complete::tag(b"endstream")(remainder)?;
     let (remainder, _) = require_termination(remainder)?;
@@ -214,7 +216,7 @@ fn stream_by_length(length: usize, input: Span) -> IResult<Span, Vec<u8>> {
 }
 
 #[tracable_parser]
-fn stream_by_keyword(input: Span) -> IResult<Span, Vec<u8>> {
+fn stream_by_keyword(input: Span) -> CbResult<Vec<u8>> {
     let (remainder, data) =
         combinator::map(bytes::complete::take_until(&b"endstream"[..]), |b: Span| b.to_vec())(input)?;
     let (remainder, _) = bytes::complete::tag(b"endstream")(remainder)?;
@@ -224,7 +226,7 @@ fn stream_by_keyword(input: Span) -> IResult<Span, Vec<u8>> {
 }
 
 #[tracable_parser]
-pub fn stream_object(input: Span) -> IResult<Span, Object> {
+pub fn stream_object(input: Span) -> CbResult<Object> {
     let (remainder, dict) = dictionary_object(input)?;
 
     let (remainder, _) = bytes::complete::tag(b"stream")(remainder)?;
@@ -247,7 +249,7 @@ pub fn stream_object(input: Span) -> IResult<Span, Object> {
     Ok((remainder, Object::Stream(dict, data.into())))
 }
 
-fn referred_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, Object> {
+fn referred_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> CbResult<'a, Object> {
     combinator::map(
         sequence::delimited(
             sequence::terminated(bytes::complete::tag(b"obj"), character::complete::multispace0),
@@ -264,7 +266,7 @@ fn referred_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> I
     )
 }
 
-fn reference_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, Object> {
+fn reference_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> CbResult<'a, Object> {
     combinator::map(
         sequence::terminated(character::complete::char('R'), require_termination),
         move |_| Object::Reference(Reference { index, generation }),
@@ -272,7 +274,7 @@ fn reference_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> 
 }
 
 #[tracable_parser]
-pub(crate) fn indirect_object(input: Span) -> IResult<Span, Object> {
+pub(crate) fn indirect_object(input: Span) -> CbResult<Object> {
     let (remainder, index) = character::complete::u32(input)?;
     let (remainder, _) = character::complete::multispace1(remainder)?;
     let (remainder, generation) = character::complete::u32(remainder)?;
@@ -282,7 +284,7 @@ pub(crate) fn indirect_object(input: Span) -> IResult<Span, Object> {
 }
 
 #[tracable_parser]
-pub(crate) fn object(input: Span) -> IResult<Span, Object> {
+pub(crate) fn object(input: Span) -> CbResult<Object> {
     // The order is important!
     branch::alt((
         into(dictionary_object),
@@ -300,7 +302,7 @@ pub(crate) fn object(input: Span) -> IResult<Span, Object> {
 }
 
 #[tracable_parser]
-pub(crate) fn object0(input: Span) -> IResult<Span, Vec<Object>> {
+pub(crate) fn object0(input: Span) -> CbResult<Vec<Object>> {
     let (remainder, _) = character::complete::multispace0(input)?;
     multi::many0(object)(remainder)
 }
