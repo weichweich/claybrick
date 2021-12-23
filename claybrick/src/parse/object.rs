@@ -25,6 +25,7 @@ fn is_regular(chr: u8) -> bool {
 
 /// Consume all whitespace. If input doesn't start with a whitespace, peek the
 /// next char and require it to be a delimiter.
+#[tracable_parser]
 fn require_termination(input: Span) -> IResult<Span, ()> {
     let (remainder, whitespace) = character::complete::multispace0(input)?;
     if whitespace.is_empty() && !input.is_empty() {
@@ -204,12 +205,31 @@ pub fn array_object(input: Span) -> IResult<Span, Array> {
     Ok((remainder, array))
 }
 
+fn stream_by_length(length: usize, input: Span) -> IResult<Span, Vec<u8>> {
+    let (remainder, data) = combinator::map(take(length), |b: Span| b.to_vec())(input)?;
+    let (remainder, _) = bytes::complete::tag(b"endstream")(remainder)?;
+    let (remainder, _) = require_termination(remainder)?;
+
+    Ok((remainder, data))
+}
+
+#[tracable_parser]
+fn stream_by_keyword(input: Span) -> IResult<Span, Vec<u8>> {
+    let (remainder, data) =
+        combinator::map(bytes::complete::take_until(&b"endstream"[..]), |b: Span| b.to_vec())(input)?;
+    let (remainder, _) = bytes::complete::tag(b"endstream")(remainder)?;
+    let (remainder, _) = require_termination(remainder)?;
+
+    Ok((remainder, data))
+}
+
 #[tracable_parser]
 pub fn stream_object(input: Span) -> IResult<Span, Object> {
     let (remainder, dict) = dictionary_object(input)?;
 
     let (remainder, _) = bytes::complete::tag(b"stream")(remainder)?;
-    let (remainder, _) = require_termination(remainder)?;
+    // stream keyword must not be followed by \r only because that would prevent streams from beginning with \n.
+    let (remainder, _) = branch::alt((bytes::complete::tag("\r\n"), bytes::complete::tag("\n")))(remainder)?;
 
     let length = match dict.get(&b"Length".to_vec().into()) {
         Some(Object::Integer(length)) => *length,
@@ -219,9 +239,10 @@ pub fn stream_object(input: Span) -> IResult<Span, Object> {
         }
     };
 
-    let (remainder, data) = combinator::map(take(usize::try_from(length).unwrap()), |b: Span| b.to_vec())(remainder)?;
-    let (remainder, _) = bytes::complete::tag(b"endstream")(remainder)?;
-    let (remainder, _) = require_termination(remainder)?;
+    // FIXME: handle usize conversion error.
+    let (remainder, data) =
+        stream_by_length(usize::try_from(length).unwrap(), remainder).or_else(|_| stream_by_keyword(remainder))?;
+    // let (remainder, data) = stream_by_keyword(remainder)?;
 
     Ok((remainder, Object::Stream(dict, data)))
 }
@@ -286,8 +307,8 @@ pub(crate) fn object0(input: Span) -> IResult<Span, Vec<Object>> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use nom::AsBytes;
+    use std::collections::HashMap;
 
     use crate::pdf::Reference;
 
@@ -570,7 +591,31 @@ endstream"
                 .as_bytes()
                 .into(),
         );
-        assert!(matches!(stream, Ok(_)), "Expected OK got: {:?}", stream);
+        assert!(
+            matches!(stream, Ok((_, Object::Stream(_, _)))),
+            "Expected OK got: {:?}",
+            stream
+        );
+    }
+
+    #[test]
+    pub fn test_stream_line_feed_start() {
+        let stream = stream_object(
+            b"<< /Length 94 >>
+stream\r\n\n\n/DeviceRGB cs /DeviceRGB CS
+0 0 0.972549 SC
+21.68 194 136.64 26 re
+10 10 m 20 20 l S
+/Im0 Do
+endstream"
+                .as_bytes()
+                .into(),
+        );
+        assert!(
+            matches!(stream, Ok((_, Object::Stream(_, _)))),
+            "Expected OK got: {:?}",
+            stream
+        );
     }
 
     #[test]
