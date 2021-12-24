@@ -1,9 +1,11 @@
 use std::{collections::HashMap, fmt::Display, ops::Deref};
 
-pub use self::array::Array;
-pub use self::indirect::{IndirectObject, Reference};
-pub use self::name::Name;
-pub use self::string::CbString;
+pub use self::{
+    array::Array,
+    indirect::{IndirectObject, Reference},
+    name::Name,
+    string::CbString,
+};
 
 mod array;
 mod indirect;

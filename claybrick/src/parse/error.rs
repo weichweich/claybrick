@@ -1,23 +1,22 @@
 use nom::error::{ErrorKind, ParseError};
 
-#[derive(Debug)]
-pub enum CbErrorKind {
-    StringInvalidUft8,
+#[derive(Debug, Clone)]
+pub enum CbParseErrorKind {
     Nom(ErrorKind),
 }
 
-#[derive(Debug)]
-pub struct CbError<I> {
+#[derive(Debug, Clone)]
+pub struct CbParseError<I> {
     pub input: I,
-    pub kind: CbErrorKind,
+    pub kind: CbParseErrorKind,
     pub from: Option<Box<Self>>,
 }
 
-impl<I> ParseError<I> for CbError<I> {
+impl<I> ParseError<I> for CbParseError<I> {
     fn from_error_kind(input: I, kind: ErrorKind) -> Self {
         Self {
             input,
-            kind: CbErrorKind::Nom(kind),
+            kind: CbParseErrorKind::Nom(kind),
             from: None,
         }
     }
@@ -25,7 +24,7 @@ impl<I> ParseError<I> for CbError<I> {
     fn append(input: I, kind: ErrorKind, other: Self) -> Self {
         Self {
             input,
-            kind: CbErrorKind::Nom(kind),
+            kind: CbParseErrorKind::Nom(kind),
             from: Some(other.into()),
         }
     }
