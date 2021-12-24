@@ -236,16 +236,15 @@ pub fn stream_object(input: Span) -> CbParseResult<Object> {
 
     let length = match dict.get(&b"Length".to_vec().into()) {
         Some(Object::Integer(length)) => *length,
-        err => {
-            println!("Err got {:?} as length (dict: {:?})", err, dict);
-            todo!()
-        }
+        l => {
+            log::warn!("ignoring length object: {:?}", l);
+            0
+        },
     };
 
-    // FIXME: handle usize conversion error.
+    // FIXME: handle huge streams
     let (remainder, data) =
         stream_by_length(usize::try_from(length).unwrap(), remainder).or_else(|_| stream_by_keyword(remainder))?;
-    // let (remainder, data) = stream_by_keyword(remainder)?;
 
     Ok((remainder, Object::Stream(dict, data.into())))
 }

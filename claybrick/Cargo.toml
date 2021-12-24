@@ -9,6 +9,7 @@ version = "0.1.0"
 nom = "7.1.0"
 nom-tracable = "0.8"
 nom_locate = "4.0"
+log = "0.4"
 
 [dev-dependencies]
 structopt = "0.3"
