@@ -109,6 +109,8 @@ pub(crate) fn hex_string_object(input: Span) -> CbParseResult<Object> {
 
     let bytes = unchecked_hex_decode(content.fragment());
 
+    let (remainder, _) = character::complete::multispace0(remainder)?;
+
     Ok((remainder, Object::HexString(bytes.into())))
 }
 
@@ -201,8 +203,9 @@ pub fn array_object(input: Span) -> CbParseResult<Array> {
             acc.push(obj);
             acc
         }),
-        sequence::terminated(character::complete::char(']'), require_termination),
+        character::complete::char(']'),
     )(input)?;
+    let (remainder, _) = character::complete::multispace0(remainder)?;
 
     Ok((remainder, array))
 }
@@ -239,7 +242,7 @@ pub fn stream_object(input: Span) -> CbParseResult<Object> {
         l => {
             log::warn!("ignoring length object: {:?}", l);
             0
-        },
+        }
     };
 
     // FIXME: handle huge streams
@@ -674,6 +677,60 @@ endstream"
                     generation: 0,
                     object: _
                 })]
+            ),
+            "Unexpected parsing result: {:#?}",
+            parsed_obj
+        );
+    }
+
+    #[test]
+    fn test_object_01() {
+        let parsed_obj = object(
+            b"20 0 obj
+<</Author<FEFF004A006F0073002000760061006E002000640065006E0020004F0065007600650072>
+/Creator<FEFF005700720069007400650072>
+/Producer<FEFF004C0069006200720065004F0066006600690063006500200035002E0033>
+/CreationDate(D:20170913090857+02'00')>>
+endobj
+"
+            .as_bytes()
+            .into(),
+        )
+        .unwrap()
+        .1;
+        assert!(
+            matches!(
+                parsed_obj,
+                Object::Indirect(IndirectObject {
+                    index: 20,
+                    generation: 0,
+                    object: _
+                })
+            ),
+            "Unexpected parsing result: {:#?}",
+            parsed_obj
+        );
+    }
+
+    #[test]
+    fn test_object_02() {
+        let parsed_obj = object(
+            b"4 0 obj
+<</Type/Font/Subtype/CIDFontType2/BaseFont/TBSXET+Arial/CIDSystemInfo<</Registry(Adobe)/Ordering(Identity)/Supplement 0>>/FontDescriptor 3 0 R/CIDToGIDMap/Identity/W[0[750 277]2 3 722 5 6 556 7[333 500 222 500 556 277 610 222 556 500]17 18 556 19[277 556 583 277]23 30 556 31[610 556 277 833]35 36 556 37[500 722 666 943 722 777]43 44 666 45[556 277 833 666 777 556 610 556 610 722 500 556 333 666 333 277]61 62 722 63 64 583 65[722 583 666 500 666 500 556]72 73 277 74[222]75 76 333 77[556 1015 500 333 556]]>>
+endobj"
+            .as_bytes()
+            .into(),
+        )
+        .unwrap()
+        .1;
+        assert!(
+            matches!(
+                parsed_obj,
+                Object::Indirect(IndirectObject {
+                    index: 4,
+                    generation: 0,
+                    object: _
+                })
             ),
             "Unexpected parsing result: {:#?}",
             parsed_obj
