@@ -8,6 +8,7 @@ use self::error::{CbParseError, CbParseErrorKind};
 
 pub mod error;
 mod object;
+mod xref;
 
 type Span<'a> = LocatedSpan<&'a [u8], TracableInfo>;
 type CbParseResult<'a, O> = IResult<Span<'a>, O, error::CbParseError<Span<'a>>>;
@@ -54,12 +55,16 @@ pub(crate) fn parse(input: Span) -> CbParseResult<Pdf> {
     let (remainder, announced_binary) = binary_indicator(remainder)?;
     let (remainder, objects) = object::object0(remainder)?;
 
+    let (remainder, _) = xref::eof_marker_tail(remainder)?;
+    let (remainder, startxref) = xref::startxref_tail(remainder)?;
+
     Ok((
         remainder,
         Pdf {
             version,
             announced_binary,
             objects,
+            startxref,
         },
     ))
 }
@@ -134,19 +139,23 @@ mod tests {
         let info = TracableInfo::new().forward(true).backward(true);
         let input = LocatedSpan::new_extra(
             b"%PDF-1.7
-        %\xbf\xbf\xbf\xbf\xbf
-        1 0 obj
-        << /Type /Catalog
-           /Pages 2 0 R
-        >>
-        endobj
-        2 0 obj
-        << /Kids [3 0 R]
-           /Type /Pages
-           /Count 1
-        >>
-        endobj"
-                .as_bytes(),
+%\xbf\xbf\xbf\xbf\xbf
+1 0 obj
+<< /Type /Catalog
+    /Pages 2 0 R
+>>
+endobj
+2 0 obj
+<< /Kids [3 0 R]
+    /Type /Pages
+    /Count 1
+>>
+endobj
+startxref
+734
+%%EOF
+"
+            .as_bytes(),
             info,
         );
 
@@ -155,6 +164,7 @@ mod tests {
             Pdf {
                 version: (1, 7),
                 announced_binary: true,
+                startxref: 734,
                 objects: vec![
                     Object::Indirect(IndirectObject {
                         index: 1,

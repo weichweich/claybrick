@@ -2,6 +2,7 @@ use nom::error::{ErrorKind, ParseError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CbParseErrorKind {
+    StartxrefInvalid,
     BackwardSearchNotFound,
     Nom(ErrorKind),
 }

@@ -17,6 +17,7 @@ pub struct Pdf {
     pub(crate) version: (u8, u8),
     pub(crate) announced_binary: bool,
     pub(crate) objects: Vec<Object>,
+    pub(crate) startxref: usize,
 }
 
 impl Display for Pdf {
