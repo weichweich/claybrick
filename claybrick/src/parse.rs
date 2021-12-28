@@ -1,8 +1,10 @@
-use nom::{bytes, character, IResult};
+use nom::{bytes, character, error::ParseError, IResult, InputIter, InputLength, InputTake, Parser};
 use nom_locate::LocatedSpan;
 use nom_tracable::{tracable_parser, TracableInfo};
 
 use crate::pdf::Pdf;
+
+use self::error::{CbParseError, CbParseErrorKind};
 
 pub mod error;
 mod object;
@@ -62,12 +64,54 @@ pub(crate) fn parse(input: Span) -> CbParseResult<Pdf> {
     ))
 }
 
+/// Applies the supplied parser to the end of the input. Returns the beginning
+/// of the input that wasn't recognized and the output of the supplied parser.
+pub(crate) fn backward_search<P, Input, O, Error: ParseError<Input>>(
+    limit: usize,
+    mut parser: P,
+) -> impl FnMut(Input) -> IResult<Input, (Input, O), CbParseError<Input>>
+where
+    Input: InputIter + InputTake + InputLength + Copy,
+    P: Parser<Input, O, Error>,
+{
+    move |input: Input| {
+        for i in 1..=input.input_len().min(limit) {
+            let (end, start) = bytes::complete::take(input.input_len() - i)(input)?;
+            let res = parser.parse(end);
+            if let Ok(res) = res {
+                return Ok((start, res));
+            }
+        }
+        Err(nom::Err::Error(CbParseError::new(
+            input,
+            CbParseErrorKind::BackwardSearchNotFound,
+        )))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use nom::AsBytes;
 
     use super::*;
     use crate::pdf::{Dictionary, IndirectObject, Object, Reference};
+
+    #[test]
+    fn test_backward_search() {
+        let input = &b"Hello World!"[..];
+
+        let res = backward_search::<_, _, _, CbParseError<&[u8]>>(6, nom::bytes::complete::tag(b"World"))(input);
+        assert_eq!(res, Ok((&b"Hello "[..], (&b"!"[..], &b"World"[..]))));
+
+        let res = backward_search::<_, _, _, CbParseError<&[u8]>>(5, nom::bytes::complete::tag(b"World"))(input);
+        assert_eq!(
+            res,
+            Err(nom::Err::Error(CbParseError::new(
+                input,
+                CbParseErrorKind::BackwardSearchNotFound
+            )))
+        );
+    }
 
     #[test]
     fn test_parse_version() {

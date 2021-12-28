@@ -1,15 +1,26 @@
 use nom::error::{ErrorKind, ParseError};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CbParseErrorKind {
+    BackwardSearchNotFound,
     Nom(ErrorKind),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CbParseError<I> {
     pub input: I,
     pub kind: CbParseErrorKind,
     pub from: Option<Box<Self>>,
+}
+
+impl<I> CbParseError<I> {
+    pub fn new(input: I, kind: CbParseErrorKind) -> Self {
+        Self {
+            input,
+            kind,
+            from: None,
+        }
+    }
 }
 
 impl<I> ParseError<I> for CbParseError<I> {
