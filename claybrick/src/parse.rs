@@ -50,21 +50,28 @@ fn binary_indicator(input: Span) -> CbParseResult<bool> {
 
 #[tracable_parser]
 pub(crate) fn parse(input: Span) -> CbParseResult<Pdf> {
-    let (remainder, _) = character::complete::multispace0(input)?;
-    let (remainder, version) = version(remainder)?;
-    let (remainder, announced_binary) = binary_indicator(remainder)?;
-    let (remainder, objects) = object::object0(remainder)?;
+    // parse version and binary indicator comment. remainder_obj should contain objects
+    let (remainder_obj, _) = character::complete::multispace0(input)?;
+    let (remainder_obj, version) = version(remainder_obj)?;
+    let (remainder_obj, announced_binary) = binary_indicator(remainder_obj)?;
+    // NOTE: no need to read all objects, we could parse xref table first.
+    let (_, objects) = object::object0(remainder_obj)?;
 
-    let (remainder, _) = xref::eof_marker_tail(remainder)?;
-    let (remainder, startxref) = xref::startxref_tail(remainder)?;
+    // find start of the xref section
+    let (remainder_xref, _) = xref::eof_marker_tail(input)?;
+    let (_, startxref) = xref::startxref_tail(remainder_xref)?;
+
+    let (remainder_xref, _) = nom::bytes::complete::take(startxref)(input)?;
+    let (_, xref) = xref::xref_table(remainder_xref)?;
 
     Ok((
-        remainder,
+        input,
         Pdf {
             version,
             announced_binary,
-            objects,
+            objects: objects,
             startxref,
+            xref,
         },
     ))
 }
@@ -99,7 +106,7 @@ mod tests {
     use nom::AsBytes;
 
     use super::*;
-    use crate::pdf::{Dictionary, IndirectObject, Object, Reference};
+    use crate::pdf::{Dictionary, IndirectObject, Object, Reference, XrefTableEntry};
 
     #[test]
     fn test_backward_search() {
@@ -151,8 +158,11 @@ endobj
     /Count 1
 >>
 endobj
+xref
+0 6
+0000000003 65535 f\r\n0000000017 00000 n\r\n0000000081 00000 n\r\n0000000000 00007 f\r\n0000000331 00000 n\r\n0000000409 00000 n\r\n
 startxref
-734
+134
 %%EOF
 "
             .as_bytes(),
@@ -164,7 +174,45 @@ startxref
             Pdf {
                 version: (1, 7),
                 announced_binary: true,
-                startxref: 734,
+                startxref: 134,
+                xref: vec![
+                    XrefTableEntry {
+                        object: 0,
+                        byte_offset: 3,
+                        generation: 65535,
+                        free: true
+                    },
+                    XrefTableEntry {
+                        object: 1,
+                        byte_offset: 17,
+                        generation: 0,
+                        free: false
+                    },
+                    XrefTableEntry {
+                        object: 2,
+                        byte_offset: 81,
+                        generation: 0,
+                        free: false
+                    },
+                    XrefTableEntry {
+                        object: 3,
+                        byte_offset: 0,
+                        generation: 7,
+                        free: true
+                    },
+                    XrefTableEntry {
+                        object: 4,
+                        byte_offset: 331,
+                        generation: 0,
+                        free: false
+                    },
+                    XrefTableEntry {
+                        object: 5,
+                        byte_offset: 409,
+                        generation: 0,
+                        free: false
+                    }
+                ],
                 objects: vec![
                     Object::Indirect(IndirectObject {
                         index: 1,

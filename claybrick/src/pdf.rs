@@ -18,6 +18,7 @@ pub struct Pdf {
     pub(crate) announced_binary: bool,
     pub(crate) objects: Vec<Object>,
     pub(crate) startxref: usize,
+    pub(crate) xref: Vec<XrefTableEntry>,
 }
 
 impl Display for Pdf {
@@ -141,3 +142,13 @@ impl std::fmt::Display for Bytes {
 }
 
 pub type Dictionary = HashMap<Name, Object>;
+
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XrefTableEntry {
+    pub object: usize,
+    pub byte_offset: usize,
+    pub generation: u32,
+    /// Marks objects that are not in use/deleted as free.
+    pub free: bool,
+}
