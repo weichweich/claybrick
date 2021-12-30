@@ -9,7 +9,7 @@ use super::{
     CbParseResult, Span,
 };
 
-const EOF_MARKER: &[u8] = b"\n%%EOF\n";
+const EOF_MARKER: &[u8] = b"%%EOF";
 const STARTXREF: &[u8] = b"startxref";
 
 #[tracable_parser]
@@ -84,7 +84,7 @@ pub(crate) fn eof_marker_tail(input: Span) -> CbParseResult<()> {
     // trailing bytes that follow the EOF marker are not possible since the limit we
     // provided is the length of the EOF marker
     let (remainder, _trailing) = backward_search::<_, _, _, CbParseError<Span>>(
-        EOF_MARKER.len() + 2,
+        EOF_MARKER.len(),
         bytes::complete::tag_no_case(EOF_MARKER),
     )(input)?;
 
