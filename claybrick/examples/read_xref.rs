@@ -6,7 +6,7 @@ use structopt::StructOpt;
 
 /// Read PDF files and print the internal representation.
 #[derive(StructOpt, Debug)]
-#[structopt(name = "basic")]
+#[structopt(name = "claybrick-xref")]
 struct Opt {
     /// Output file
     #[structopt(short, long, parse(from_os_str))]

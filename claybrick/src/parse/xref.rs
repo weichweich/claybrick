@@ -109,7 +109,7 @@ pub fn eof_marker_tail<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbP
     // trailing bytes that follow the EOF marker are not possible since the limit we
     // provided is the length of the EOF marker
     let (remainder, _trailing) = backward_search::<_, _, _, CbParseError<Span<X>>>(
-        EOF_MARKER.len(),
+        EOF_MARKER.len() + 4,
         bytes::complete::tag_no_case(EOF_MARKER),
     )(input)?;
 
