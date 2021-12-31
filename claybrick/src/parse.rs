@@ -1,6 +1,6 @@
 use nom::{bytes, character, error::ParseError, IResult, InputIter, InputLength, InputTake, Parser};
 use nom_locate::LocatedSpan;
-use nom_tracable::{tracable_parser, TracableInfo};
+use nom_tracable::tracable_parser;
 
 use crate::pdf::Pdf;
 
@@ -10,11 +10,11 @@ pub mod error;
 mod object;
 mod xref;
 
-type Span<'a> = LocatedSpan<&'a [u8], TracableInfo>;
-type CbParseResult<'a, O> = IResult<Span<'a>, O, error::CbParseError<Span<'a>>>;
+type Span<'a, X> = LocatedSpan<&'a [u8], X>;
+type CbParseResult<'a, O, X> = IResult<Span<'a, X>, O, error::CbParseError<Span<'a, X>>>;
 
 #[tracable_parser]
-fn version(input: Span) -> CbParseResult<(u8, u8)> {
+fn version<X: Clone>(input: Span<X>) -> CbParseResult<(u8, u8), X> {
     let (remainder, _) = bytes::complete::tag_no_case("%PDF-")(input)?;
     let (remainder, major) = character::complete::u8(remainder)?;
     let (remainder, _) = character::complete::char('.')(remainder)?;
@@ -25,7 +25,7 @@ fn version(input: Span) -> CbParseResult<(u8, u8)> {
 }
 
 #[tracable_parser]
-fn comment(input: Span) -> CbParseResult<Span> {
+fn comment<X: Clone>(input: Span<X>) -> CbParseResult<Span<X>, X> {
     let (remainder, _) = character::complete::multispace0(input)?;
     let (remainder, _) = character::complete::char('%')(remainder)?;
     let (remainder, comment) = character::complete::not_line_ending(remainder)?;
@@ -36,7 +36,7 @@ fn comment(input: Span) -> CbParseResult<Span> {
 }
 
 #[tracable_parser]
-fn binary_indicator(input: Span) -> CbParseResult<bool> {
+fn binary_indicator<X: Clone + Copy>(input: Span<X>) -> CbParseResult<bool, X> {
     if let Ok((r, comment)) = comment(input) {
         if comment.len() > 3 && !comment.iter().any(|&d| d < 128) {
             Ok((r, true))
@@ -49,7 +49,7 @@ fn binary_indicator(input: Span) -> CbParseResult<bool> {
 }
 
 #[tracable_parser]
-pub(crate) fn parse(input: Span) -> CbParseResult<Pdf> {
+pub(crate) fn parse<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Pdf, X> {
     // parse version and binary indicator comment. remainder_obj should contain objects
     let (remainder_obj, _) = character::complete::multispace0(input)?;
     let (remainder_obj, version) = version(remainder_obj)?;
@@ -104,6 +104,7 @@ where
 #[cfg(test)]
 mod tests {
     use nom::AsBytes;
+    use nom_tracable::TracableInfo;
 
     use super::*;
     use crate::pdf::{Dictionary, IndirectObject, Object, Reference, XrefTableEntry};

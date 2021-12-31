@@ -5,12 +5,14 @@ pub use self::{
     indirect::{IndirectObject, Reference},
     name::Name,
     string::CbString,
+    stream::Stream,
 };
 
 mod array;
 mod indirect;
 mod name;
 mod string;
+mod stream;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pdf {
@@ -43,7 +45,7 @@ pub enum Object {
     Name(Name),
     Array(Array),
     Dictionary(Dictionary),
-    Stream(Dictionary, Bytes),
+    Stream(Stream),
     Null,
     Indirect(IndirectObject),
     Reference(Reference),
@@ -61,7 +63,7 @@ impl Display for Object {
             Object::Array(obj) => obj.fmt(f),
             //TODO: implement display
             Object::Dictionary(_obj) => write!(f, "dict"),
-            Object::Stream(_dict, _data) => write!(f, "Stream {{}}"),
+            Object::Stream(Stream{dictionary: _dict, data: _data}) => write!(f, "Stream {{}}"),
             Object::Null => write!(f, "NULL"),
             Object::Indirect(obj) => obj.fmt(f),
             Object::Reference(obj) => write!(f, "{:?}", obj),
@@ -117,8 +119,14 @@ impl From<Dictionary> for Object {
     }
 }
 
+impl From<Stream> for Object {
+    fn from(s: Stream) -> Self {
+        Self::Stream(s)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Bytes(Vec<u8>);
+pub struct Bytes(pub Vec<u8>);
 
 impl From<Vec<u8>> for Bytes {
     fn from(v: Vec<u8>) -> Self {
