@@ -5,7 +5,7 @@ use nom::{
     combinator::{self, into},
     multi, number, sequence,
 };
-use nom_tracable::tracable_parser;
+use nom_tracable::{tracable_parser, HasTracableInfo};
 
 use crate::{
     parse::{comment, Span},
@@ -28,7 +28,7 @@ fn is_regular(chr: u8) -> bool {
 /// Consume all whitespace. If input doesn't start with a whitespace, peek the
 /// next char and require it to be a delimiter.
 #[tracable_parser]
-fn require_termination<X: Clone + Copy>(input: Span<X>) -> CbParseResult<(), X> {
+fn require_termination<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<(), X> {
     let (remainder, whitespace) = character::complete::multispace0(input)?;
     if whitespace.is_empty() && !input.is_empty() {
         // TODO: there has to be a better way to require one char that fullfils a
@@ -38,7 +38,7 @@ fn require_termination<X: Clone + Copy>(input: Span<X>) -> CbParseResult<(), X> 
     Ok((remainder, ()))
 }
 
-fn consume_until_parenthesis<X: Clone + Copy>(input: Span<X>) -> Span<X> {
+fn consume_until_parenthesis<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> Span<X> {
     bytes::complete::escaped::<_, (), _, _, _, _>(
         character::complete::none_of("\\()"),
         '\\',
@@ -49,7 +49,7 @@ fn consume_until_parenthesis<X: Clone + Copy>(input: Span<X>) -> Span<X> {
 }
 
 #[tracable_parser]
-fn consume_string_content<X: Clone + Copy>(input: Span<X>) -> CbParseResult<(), X> {
+fn consume_string_content<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<(), X> {
     let mut open_parathesis = 0;
     let mut remainder = input;
 
@@ -100,7 +100,7 @@ fn unchecked_hex_decode(input: &[u8]) -> Vec<u8> {
 }
 
 #[tracable_parser]
-pub(crate) fn hex_string_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Object, X> {
+pub(crate) fn hex_string_object<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Object, X> {
     let (remainder, content) = sequence::delimited(
         character::complete::char('<'),
         character::complete::hex_digit1,
@@ -115,7 +115,7 @@ pub(crate) fn hex_string_object<X: Clone + Copy>(input: Span<X>) -> CbParseResul
 }
 
 #[tracable_parser]
-pub(crate) fn string_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Object, X> {
+pub(crate) fn string_object<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Object, X> {
     let (remainder, content) = sequence::delimited(
         character::complete::char('('),
         combinator::recognize(consume_string_content),
@@ -127,7 +127,7 @@ pub(crate) fn string_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Ob
 }
 
 #[tracable_parser]
-pub(crate) fn bool_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Object, X> {
+pub(crate) fn bool_object<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Object, X> {
     let (remainder, obj) = branch::alt((
         combinator::value(Object::Bool(true), bytes::complete::tag(TRUE_OBJECT)),
         combinator::value(Object::Bool(false), bytes::complete::tag(FALSE_OBJECT)),
@@ -139,7 +139,7 @@ pub(crate) fn bool_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Obje
 }
 
 #[tracable_parser]
-pub(crate) fn number_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Object, X> {
+pub(crate) fn number_object<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Object, X> {
     branch::alt((
         combinator::map(
             sequence::terminated(character::complete::i32, require_termination),
@@ -153,7 +153,7 @@ pub(crate) fn number_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Ob
 }
 
 #[tracable_parser]
-pub(crate) fn null_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Object, X> {
+pub(crate) fn null_object<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Object, X> {
     let (remainder, _) = bytes::complete::tag(b"null")(input)?;
     let (remainder, _) = require_termination(remainder)?;
 
@@ -161,7 +161,7 @@ pub(crate) fn null_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Obje
 }
 
 #[tracable_parser]
-pub(crate) fn name_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Name, X> {
+pub(crate) fn name_object<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Name, X> {
     let (remainder, _) = character::complete::char('/')(input)?;
     let (remainder, name) = bytes::complete::take_while(is_regular)(remainder)?;
     let (remainder, _) = require_termination(remainder)?;
@@ -172,7 +172,7 @@ pub(crate) fn name_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Name
 }
 
 #[tracable_parser]
-pub(crate) fn dictionary_entry<X: Clone + Copy>(input: Span<X>) -> CbParseResult<(Name, Object), X> {
+pub(crate) fn dictionary_entry<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<(Name, Object), X> {
     let (remainder, name) = name_object(input)?;
     let (remainder, obj) = object(remainder)?;
     let (remainder, _) = multi::many0(comment)(remainder)?;
@@ -181,7 +181,7 @@ pub(crate) fn dictionary_entry<X: Clone + Copy>(input: Span<X>) -> CbParseResult
 }
 
 #[tracable_parser]
-pub(crate) fn dictionary_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Dictionary, X> {
+pub(crate) fn dictionary_object<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Dictionary, X> {
     let (remainder, map) = sequence::delimited(
         sequence::terminated(bytes::complete::tag(b"<<"), character::complete::multispace0),
         multi::fold_many0(dictionary_entry, Dictionary::new, |mut acc, (name, obj)| {
@@ -196,7 +196,7 @@ pub(crate) fn dictionary_object<X: Clone + Copy>(input: Span<X>) -> CbParseResul
 }
 
 #[tracable_parser]
-pub(crate) fn array_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Array, X> {
+pub(crate) fn array_object<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Array, X> {
     let (remainder, array) = sequence::delimited(
         sequence::pair(character::complete::char('['), character::complete::multispace0),
         multi::fold_many0(object, Array::new, |mut acc, obj| {
@@ -210,7 +210,7 @@ pub(crate) fn array_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Arr
     Ok((remainder, array))
 }
 
-fn stream_by_length<X: Clone + Copy>(length: usize, input: Span<X>) -> CbParseResult<Vec<u8>, X> {
+fn stream_by_length<X: Clone + Copy + HasTracableInfo>(length: usize, input: Span<X>) -> CbParseResult<Vec<u8>, X> {
     let (remainder, data) = combinator::map(take(length), |b: Span<X>| b.to_vec())(input)?;
     let (remainder, _) = bytes::complete::tag(b"endstream")(remainder)?;
     let (remainder, _) = require_termination(remainder)?;
@@ -219,7 +219,7 @@ fn stream_by_length<X: Clone + Copy>(length: usize, input: Span<X>) -> CbParseRe
 }
 
 #[tracable_parser]
-fn stream_by_keyword<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Vec<u8>, X> {
+fn stream_by_keyword<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec<u8>, X> {
     let (remainder, data) =
         combinator::map(bytes::complete::take_until(&b"endstream"[..]), |b: Span<X>| b.to_vec())(input)?;
     let (remainder, _) = bytes::complete::tag(b"endstream")(remainder)?;
@@ -229,7 +229,7 @@ fn stream_by_keyword<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Vec<u8>, 
 }
 
 #[tracable_parser]
-pub(crate) fn stream_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Stream, X> {
+pub(crate) fn stream_object<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Stream, X> {
     let (remainder, dict) = dictionary_object(input)?;
 
     let (remainder, _) = bytes::complete::tag(b"stream")(remainder)?;
@@ -258,7 +258,7 @@ pub(crate) fn stream_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<St
     ))
 }
 
-fn referred_object<'a, X: Clone + Copy>(
+fn referred_object<'a, X: Clone + Copy + HasTracableInfo>(
     index: u32,
     generation: u32,
 ) -> impl FnMut(Span<'a, X>) -> CbParseResult<'a, Object, X> {
@@ -278,7 +278,7 @@ fn referred_object<'a, X: Clone + Copy>(
     )
 }
 
-fn reference_object<'a, X: Clone + Copy>(
+fn reference_object<'a, X: Clone + Copy + HasTracableInfo>(
     index: u32,
     generation: u32,
 ) -> impl FnMut(Span<'a, X>) -> CbParseResult<'a, Object, X> {
@@ -289,7 +289,7 @@ fn reference_object<'a, X: Clone + Copy>(
 }
 
 #[tracable_parser]
-pub(crate) fn indirect_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Object, X> {
+pub(crate) fn indirect_object<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Object, X> {
     let (remainder, index) = character::complete::u32(input)?;
     let (remainder, _) = character::complete::multispace1(remainder)?;
     let (remainder, generation) = character::complete::u32(remainder)?;
@@ -299,7 +299,7 @@ pub(crate) fn indirect_object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<
 }
 
 #[tracable_parser]
-pub(crate) fn object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Object, X> {
+pub(crate) fn object<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Object, X> {
     // The order is important!
     branch::alt((
         into(dictionary_object),
@@ -317,7 +317,7 @@ pub(crate) fn object<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Object, X
 }
 
 #[tracable_parser]
-pub(crate) fn object0<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Vec<Object>, X> {
+pub(crate) fn object0<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec<Object>, X> {
     let (remainder, _) = character::complete::multispace0(input)?;
     multi::many0(object)(remainder)
 }
@@ -325,6 +325,7 @@ pub(crate) fn object0<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Vec<Obje
 #[cfg(test)]
 mod tests {
     use nom::AsBytes;
+    use nom_tracable::TracableInfo;
     use std::collections::HashMap;
 
     use crate::pdf::Reference;
@@ -334,64 +335,64 @@ mod tests {
     #[test]
     pub fn test_termination() {
         assert_eq!(
-            require_termination::<()>(b"  asdf".as_bytes().into())
+            require_termination::<TracableInfo>(b"  asdf".as_bytes().into())
                 .unwrap()
                 .0
                 .fragment(),
             &b"asdf".as_bytes()
         );
         assert_eq!(
-            require_termination::<()>(b"".as_bytes().into()).unwrap().0.fragment(),
+            require_termination::<TracableInfo>(b"".as_bytes().into()).unwrap().0.fragment(),
             &b"".as_bytes()
         );
         assert_eq!(
-            require_termination::<()>(b"(".as_bytes().into()).unwrap().0.fragment(),
+            require_termination::<TracableInfo>(b"(".as_bytes().into()).unwrap().0.fragment(),
             &b"(".as_bytes()
         );
-        assert!(require_termination::<()>(b"asdf".as_bytes().into()).is_err());
+        assert!(require_termination::<TracableInfo>(b"asdf".as_bytes().into()).is_err());
     }
 
     #[test]
     pub fn test_consume_until_parenthesis() {
         assert_eq!(
-            consume_until_parenthesis::<()>(r"aasd(sadf".as_bytes().into()).fragment(),
+            consume_until_parenthesis::<TracableInfo>(r"aasd(sadf".as_bytes().into()).fragment(),
             &"(sadf".as_bytes()
         );
         assert_eq!(
-            consume_until_parenthesis::<()>(r"aasd\(asd(".as_bytes().into()).fragment(),
+            consume_until_parenthesis::<TracableInfo>(r"aasd\(asd(".as_bytes().into()).fragment(),
             &"(".as_bytes()
         );
         assert_eq!(
-            consume_until_parenthesis::<()>(r")".as_bytes().into()).fragment(),
+            consume_until_parenthesis::<TracableInfo>(r")".as_bytes().into()).fragment(),
             &")".as_bytes()
         );
     }
 
     #[test]
     pub fn test_bool_object() {
-        assert_eq!(object::<()>(b"true ".as_bytes().into()).unwrap().1, Object::Bool(true));
+        assert_eq!(object::<TracableInfo>(b"true ".as_bytes().into()).unwrap().1, Object::Bool(true));
         assert_eq!(
-            object::<()>(b"false ".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"false ".as_bytes().into()).unwrap().1,
             Object::Bool(false)
         );
         assert_eq!(
-            object::<()>(b"false%a-comment".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"false%a-comment".as_bytes().into()).unwrap().1,
             Object::Bool(false)
         );
-        assert!(object::<()>(b"falsee".as_bytes().into()).is_err());
-        assert!(object::<()>(b"afalse".as_bytes().into()).is_err());
+        assert!(object::<TracableInfo>(b"falsee".as_bytes().into()).is_err());
+        assert!(object::<TracableInfo>(b"afalse".as_bytes().into()).is_err());
     }
 
     #[test]
     pub fn test_integer_object() {
-        assert_eq!(object::<()>(b"123".as_bytes().into()).unwrap().1, Object::Integer(123));
+        assert_eq!(object::<TracableInfo>(b"123".as_bytes().into()).unwrap().1, Object::Integer(123));
         assert_eq!(
-            object::<()>(b"-123".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"-123".as_bytes().into()).unwrap().1,
             Object::Integer(-123)
         );
-        assert_eq!(object::<()>(b"+123".as_bytes().into()).unwrap().1, Object::Integer(123));
+        assert_eq!(object::<TracableInfo>(b"+123".as_bytes().into()).unwrap().1, Object::Integer(123));
         assert_eq!(
-            object::<()>(b"-123%a-comment".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"-123%a-comment".as_bytes().into()).unwrap().1,
             Object::Integer(-123)
         );
     }
@@ -399,45 +400,45 @@ mod tests {
     #[test]
     pub fn test_float_object() {
         assert_eq!(
-            object::<()>(b"123.123 ".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"123.123 ".as_bytes().into()).unwrap().1,
             Object::Float(123.123)
         );
         assert_eq!(
-            object::<()>(b"-123.123 ".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"-123.123 ".as_bytes().into()).unwrap().1,
             Object::Float(-123.123)
         );
         assert_eq!(
-            object::<()>(b"-123.123%a-comment".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"-123.123%a-comment".as_bytes().into()).unwrap().1,
             Object::Float(-123.123)
         );
-        assert!(object::<()>(b"d123.123 ".as_bytes().into()).is_err());
-        assert!(object::<()>(b"-1c23.123 ".as_bytes().into()).is_err());
+        assert!(object::<TracableInfo>(b"d123.123 ".as_bytes().into()).is_err());
+        assert!(object::<TracableInfo>(b"-1c23.123 ".as_bytes().into()).is_err());
     }
 
     #[test]
     pub fn test_string_object() {
         assert_eq!(
-            object::<()>(b"()\n".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"()\n".as_bytes().into()).unwrap().1,
             Object::String(b"".to_vec().into())
         );
         assert_eq!(
-            object::<()>(b"(a) ".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"(a) ".as_bytes().into()).unwrap().1,
             Object::String(b"a".to_vec().into())
         );
         assert_eq!(
-            object::<()>(b"((a)) ".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"((a)) ".as_bytes().into()).unwrap().1,
             Object::String(b"(a)".to_vec().into())
         );
         assert_eq!(
-            object::<()>(br"((\(a)) ".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(br"((\(a)) ".as_bytes().into()).unwrap().1,
             Object::String(br"(\(a)".to_vec().into())
         );
         assert_eq!(
-            object::<()>(br"(a\)\)\)) ".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(br"(a\)\)\)) ".as_bytes().into()).unwrap().1,
             Object::String(br"a\)\)\)".to_vec().into())
         );
         assert_eq!(
-            object::<()>(b"(123\\nmnbvcx)\n".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"(123\\nmnbvcx)\n".as_bytes().into()).unwrap().1,
             Object::String(b"123\\nmnbvcx".to_vec().into())
         );
     }
@@ -461,35 +462,35 @@ mod tests {
     #[test]
     pub fn test_hex_string_object() {
         assert_eq!(
-            object::<()>(b"<FFFFFFFFFFFF>".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"<FFFFFFFFFFFF>".as_bytes().into()).unwrap().1,
             Object::HexString(b"\xFF\xFF\xFF\xFF\xFF\xFF".to_vec().into())
         )
     }
 
     #[test]
     pub fn test_null_object() {
-        assert_eq!(object::<()>("null\n".as_bytes().into()).unwrap().1, Object::Null);
+        assert_eq!(object::<TracableInfo>("null\n".as_bytes().into()).unwrap().1, Object::Null);
     }
 
     #[test]
     pub fn test_name_object() {
-        assert!(object::<()>(b"/Name1".as_bytes().into()).is_ok());
-        assert!(object::<()>(b"/ASomewhatLongerName".as_bytes().into()).is_ok());
-        assert!(object::<()>(b"/A;Name_With-Various***Characters?".as_bytes().into()).is_ok());
-        assert!(object::<()>(b"/1.2".as_bytes().into()).is_ok());
-        assert!(object::<()>(b"/$$".as_bytes().into()).is_ok());
-        assert!(object::<()>(b"/@pattern".as_bytes().into()).is_ok());
-        assert!(object::<()>(b"/.notdef".as_bytes().into()).is_ok());
-        assert!(object::<()>(b"/lime#20Green".as_bytes().into()).is_ok());
-        assert!(object::<()>(b"/paired#28#29parentheses".as_bytes().into()).is_ok());
-        assert!(object::<()>(b"/The_Key_of_F#23_Minor".as_bytes().into()).is_ok());
-        assert!(object::<()>(b"/A#42".as_bytes().into()).is_ok());
+        assert!(object::<TracableInfo>(b"/Name1".as_bytes().into()).is_ok());
+        assert!(object::<TracableInfo>(b"/ASomewhatLongerName".as_bytes().into()).is_ok());
+        assert!(object::<TracableInfo>(b"/A;Name_With-Various***Characters?".as_bytes().into()).is_ok());
+        assert!(object::<TracableInfo>(b"/1.2".as_bytes().into()).is_ok());
+        assert!(object::<TracableInfo>(b"/$$".as_bytes().into()).is_ok());
+        assert!(object::<TracableInfo>(b"/@pattern".as_bytes().into()).is_ok());
+        assert!(object::<TracableInfo>(b"/.notdef".as_bytes().into()).is_ok());
+        assert!(object::<TracableInfo>(b"/lime#20Green".as_bytes().into()).is_ok());
+        assert!(object::<TracableInfo>(b"/paired#28#29parentheses".as_bytes().into()).is_ok());
+        assert!(object::<TracableInfo>(b"/The_Key_of_F#23_Minor".as_bytes().into()).is_ok());
+        assert!(object::<TracableInfo>(b"/A#42".as_bytes().into()).is_ok());
     }
 
     #[test]
     pub fn test_dictionary() {
         let obj = Object::Dictionary(HashMap::from([(b"Length".to_vec().into(), Object::Integer(93))]));
-        assert_eq!(object::<()>(b"<< /Length 93 >>".as_bytes().into()).unwrap().1, obj);
+        assert_eq!(object::<TracableInfo>(b"<< /Length 93 >>".as_bytes().into()).unwrap().1, obj);
 
         let obj = Object::Dictionary(HashMap::from([
             (b"Type".to_vec().into(), Object::Name(b"Example".to_vec().into())),
@@ -512,7 +513,7 @@ mod tests {
             ),
         ]));
         assert_eq!(
-            object::<()>(
+            object::<TracableInfo>(
                 b"<< /Type /Example
         /Subtype /DictionaryExample
         /Version 0.01%A COMMENT
@@ -534,7 +535,7 @@ mod tests {
     #[test]
     pub fn test_array_object() {
         assert_eq!(
-            object::<()>(b"[549 3.14 false (Ralph) /SomeName]".as_bytes().into())
+            object::<TracableInfo>(b"[549 3.14 false (Ralph) /SomeName]".as_bytes().into())
                 .unwrap()
                 .1,
             Object::Array(Array::from(vec![
@@ -546,15 +547,15 @@ mod tests {
             ]))
         );
         assert_eq!(
-            object::<()>(b"[]".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"[]".as_bytes().into()).unwrap().1,
             Object::Array(Array::new())
         );
         assert_eq!(
-            object::<()>(b"[459]".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"[459]".as_bytes().into()).unwrap().1,
             Object::Array(Array::from(vec![Object::Integer(459)]))
         );
         assert_eq!(
-            object::<()>(b"[false]".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"[false]".as_bytes().into()).unwrap().1,
             Object::Array(Array::from(vec![Object::Bool(false)]))
         );
     }
@@ -562,7 +563,7 @@ mod tests {
     #[test]
     pub fn test_indirect_object() {
         assert_eq!(
-            object::<()>(b"0 0 obj null endobj".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>(b"0 0 obj null endobj".as_bytes().into()).unwrap().1,
             Object::Indirect(IndirectObject {
                 index: 0,
                 generation: 0,
@@ -570,7 +571,7 @@ mod tests {
             })
         );
         assert_eq!(
-            object::<()>(
+            object::<TracableInfo>(
                 b"1 0 obj
             << /Type /Catalog
                /Pages 2 0 R
@@ -601,7 +602,7 @@ mod tests {
     #[test]
     pub fn test_reference_object() {
         assert_eq!(
-            object::<()>("0 0 R".as_bytes().into()).unwrap().1,
+            object::<TracableInfo>("0 0 R".as_bytes().into()).unwrap().1,
             Object::Reference(Reference {
                 index: 0,
                 generation: 0,
@@ -611,7 +612,7 @@ mod tests {
 
     #[test]
     pub fn test_stream() {
-        let stream = stream_object::<()>(
+        let stream = stream_object::<TracableInfo>(
             b"<< /Length 93 >>
 stream
 /DeviceRGB cs /DeviceRGB CS
@@ -632,7 +633,7 @@ endstream"
 
     #[test]
     pub fn test_stream_line_feed_start() {
-        let stream = stream_object::<()>(
+        let stream = stream_object::<TracableInfo>(
             b"<< /Length 94 >>
 stream\r\n\n\n/DeviceRGB cs /DeviceRGB CS
 0 0 0.972549 SC
@@ -652,7 +653,7 @@ endstream"
 
     #[test]
     pub fn test_object0() {
-        let parsed_obj = object0::<()>(
+        let parsed_obj = object0::<TracableInfo>(
             b"     1 0 obj
         << /Type /Catalog
            /Pages 2 0 R
@@ -689,7 +690,7 @@ endstream"
 
     #[test]
     fn test_object_00() {
-        let parsed_obj = object0::<()>(
+        let parsed_obj = object0::<TracableInfo>(
             b"8784 0 obj <</Linearized 1/L 6962693/O 8787/E 131293/N 768/T 6954970/H [ 2799 5432]>>\rendobj"
                 .as_bytes()
                 .into(),
@@ -712,7 +713,7 @@ endstream"
 
     #[test]
     fn test_object_01() {
-        let parsed_obj = object::<()>(
+        let parsed_obj = object::<TracableInfo>(
             b"20 0 obj
 <</Author<FEFF004A006F0073002000760061006E002000640065006E0020004F0065007600650072>
 /Creator<FEFF005700720069007400650072>
@@ -741,7 +742,7 @@ endobj
 
     #[test]
     fn test_object_02() {
-        let parsed_obj = object::<()>(
+        let parsed_obj = object::<TracableInfo>(
             b"4 0 obj
 <</Type/Font/Subtype/CIDFontType2/BaseFont/TBSXET+Arial/CIDSystemInfo<</Registry(Adobe)/Ordering(Identity)/Supplement 0>>/FontDescriptor 3 0 R/CIDToGIDMap/Identity/W[0[750 277]2 3 722 5 6 556 7[333 500 222 500 556 277 610 222 556 500]17 18 556 19[277 556 583 277]23 30 556 31[610 556 277 833]35 36 556 37[500 722 666 943 722 777]43 44 666 45[556 277 833 666 777 556 610 556 610 722 500 556 333 666 333 277]61 62 722 63 64 583 65[722 583 666 500 666 500 556]72 73 277 74[222]75 76 333 77[556 1015 500 333 556]]>>
 endobj"

@@ -1,5 +1,5 @@
 use nom::{branch, bytes, character, combinator, multi};
-use nom_tracable::tracable_parser;
+use nom_tracable::{tracable_parser, HasTracableInfo, TracableInfo};
 
 use crate::pdf::{Bytes, Stream, XrefTableEntry};
 
@@ -13,7 +13,7 @@ const EOF_MARKER: &[u8] = b"%%EOF";
 const STARTXREF: &[u8] = b"startxref";
 
 #[tracable_parser]
-pub(crate) fn startxref_tail<X: Clone + Copy>(input: Span<X>) -> CbParseResult<usize, X> {
+pub(crate) fn startxref_tail<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<usize, X> {
     let (remainder, (trailing, _)) = backward_search::<_, _, _, CbParseError<Span<X>>>(
         STARTXREF.len() + 2048,
         bytes::complete::tag_no_case(STARTXREF),
@@ -28,7 +28,7 @@ pub(crate) fn startxref_tail<X: Clone + Copy>(input: Span<X>) -> CbParseResult<u
 }
 
 #[tracable_parser]
-fn xref_entries<X: Clone>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, X> {
+fn xref_entries<X: Clone+ HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, X> {
     let (remainder, obj_index_offset) = character::complete::u32(input)?;
     let (remainder, _) = character::complete::multispace0(remainder)?;
     let (remainder, obj_count) = character::complete::u32(remainder)?;
@@ -65,7 +65,7 @@ fn xref_entries<X: Clone>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, 
 }
 
 #[tracable_parser]
-pub(crate) fn xref_table<X: Clone>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, X> {
+pub(crate) fn xref_table<X: Clone + HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, X> {
     // xref keyword
     let (remainder, _) = character::complete::multispace0(input)?;
     let (remainder, _) = bytes::complete::tag(b"xref")(remainder)?;
@@ -80,7 +80,7 @@ pub(crate) fn xref_table<X: Clone>(input: Span<X>) -> CbParseResult<Vec<XrefTabl
 }
 
 #[tracable_parser]
-pub(crate) fn eof_marker_tail<X: Clone + Copy>(input: Span<X>) -> CbParseResult<(), X> {
+pub(crate) fn eof_marker_tail<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<(), X> {
     // trailing bytes that follow the EOF marker are not possible since the limit we
     // provided is the length of the EOF marker
     let (remainder, _trailing) = backward_search::<_, _, _, CbParseError<Span<X>>>(
@@ -98,11 +98,11 @@ mod tests {
     #[test]
     fn test_startxref_tail() {
         let input = &b"         startxref\n2132"[..];
-        let res = startxref_tail::<()>(input.into());
+        let res = startxref_tail::<TracableInfo>(input.into());
         assert!(matches!(res, Ok((_, 2132))));
 
         let input = &b"         startxref\n555\nasdfsadfasdfsadfasdfsadfsadf"[..];
-        let res = startxref_tail::<()>(input.into());
+        let res = startxref_tail::<TracableInfo>(input.into());
         assert!(matches!(res, Ok((_, 555))));
     }
 
@@ -110,7 +110,7 @@ mod tests {
     fn test_invalid_startxref_tail() {
         // to big
         let input = &b"         startxref\n9999999999999999999999999999999"[..];
-        let res = startxref_tail::<()>(input.into());
+        let res = startxref_tail::<TracableInfo>(input.into());
         assert!(matches!(res, Err(nom::Err::Error(_))));
     }
 }

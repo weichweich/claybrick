@@ -13,8 +13,16 @@ struct Opt {
 
 pub fn main() {
     let opt = Opt::from_args();
+    env_logger::init();
 
-    let pdf = claybrick::read_file(opt.input.as_path()).unwrap();
+    let pdf = claybrick::read_file(opt.input.as_path());
+    let pdf =  match pdf {
+        Ok(pdf) => pdf,
+        Err(e) => {
+            log::error!("Error while parsing: {:?}", e);
+            return
+        },
+    };
 
     histogram();
 

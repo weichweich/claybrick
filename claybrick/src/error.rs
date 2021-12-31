@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::parse::error::CbParseError;
 
 #[derive(Debug, Clone)]
@@ -6,8 +8,9 @@ pub enum CbError {
     Io,
 }
 
-impl<I> From<nom::Err<CbParseError<I>>> for CbError {
-    fn from(_err: nom::Err<CbParseError<I>>) -> Self {
+impl<I: Debug> From<nom::Err<CbParseError<I>>> for CbError {
+    fn from(err: nom::Err<CbParseError<I>>) -> Self {
+        log::error!("Parsing failed: {:?}", err);
         CbError::Parse
     }
 }

@@ -1,6 +1,6 @@
 use nom::{bytes, character, error::ParseError, IResult, InputIter, InputLength, InputTake, Parser};
 use nom_locate::LocatedSpan;
-use nom_tracable::tracable_parser;
+use nom_tracable::{tracable_parser, HasTracableInfo};
 
 use crate::pdf::Pdf;
 
@@ -14,7 +14,7 @@ type Span<'a, X> = LocatedSpan<&'a [u8], X>;
 type CbParseResult<'a, O, X> = IResult<Span<'a, X>, O, error::CbParseError<Span<'a, X>>>;
 
 #[tracable_parser]
-fn version<X: Clone>(input: Span<X>) -> CbParseResult<(u8, u8), X> {
+fn version<X: Clone + HasTracableInfo>(input: Span<X>) -> CbParseResult<(u8, u8), X> {
     let (remainder, _) = bytes::complete::tag_no_case("%PDF-")(input)?;
     let (remainder, major) = character::complete::u8(remainder)?;
     let (remainder, _) = character::complete::char('.')(remainder)?;
@@ -25,7 +25,7 @@ fn version<X: Clone>(input: Span<X>) -> CbParseResult<(u8, u8), X> {
 }
 
 #[tracable_parser]
-fn comment<X: Clone>(input: Span<X>) -> CbParseResult<Span<X>, X> {
+fn comment<X: Clone + HasTracableInfo>(input: Span<X>) -> CbParseResult<Span<X>, X> {
     let (remainder, _) = character::complete::multispace0(input)?;
     let (remainder, _) = character::complete::char('%')(remainder)?;
     let (remainder, comment) = character::complete::not_line_ending(remainder)?;
@@ -36,7 +36,7 @@ fn comment<X: Clone>(input: Span<X>) -> CbParseResult<Span<X>, X> {
 }
 
 #[tracable_parser]
-fn binary_indicator<X: Clone + Copy>(input: Span<X>) -> CbParseResult<bool, X> {
+fn binary_indicator<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<bool, X> {
     if let Ok((r, comment)) = comment(input) {
         if comment.len() > 3 && !comment.iter().any(|&d| d < 128) {
             Ok((r, true))
@@ -49,7 +49,7 @@ fn binary_indicator<X: Clone + Copy>(input: Span<X>) -> CbParseResult<bool, X> {
 }
 
 #[tracable_parser]
-pub(crate) fn parse<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Pdf, X> {
+pub(crate) fn parse<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Pdf, X> {
     // parse version and binary indicator comment. remainder_obj should contain objects
     let (remainder_obj, _) = character::complete::multispace0(input)?;
     let (remainder_obj, version) = version(remainder_obj)?;
@@ -62,7 +62,7 @@ pub(crate) fn parse<X: Clone + Copy>(input: Span<X>) -> CbParseResult<Pdf, X> {
     let (_, startxref) = xref::startxref_tail(remainder_xref)?;
 
     let (remainder_xref, _) = nom::bytes::complete::take(startxref)(input)?;
-    let (_, xref) = xref::xref_table(remainder_xref)?;
+    let (_, xref) = xref::xref(remainder_xref)?;
 
     Ok((
         input,
