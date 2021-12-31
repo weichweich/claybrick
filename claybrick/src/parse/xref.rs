@@ -1,7 +1,7 @@
 use nom::{branch, bytes, character, combinator, multi};
 use nom_tracable::{tracable_parser, HasTracableInfo, TracableInfo};
 
-use crate::pdf::{Bytes, Stream, XrefTableEntry};
+use crate::pdf::{IndirectObject, Object, Stream, XrefTableEntry};
 
 use super::{
     backward_search,
@@ -13,7 +13,7 @@ const EOF_MARKER: &[u8] = b"%%EOF";
 const STARTXREF: &[u8] = b"startxref";
 
 #[tracable_parser]
-pub(crate) fn startxref_tail<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<usize, X> {
+pub fn startxref_tail<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<usize, X> {
     let (remainder, (trailing, _)) = backward_search::<_, _, _, CbParseError<Span<X>>>(
         STARTXREF.len() + 2048,
         bytes::complete::tag_no_case(STARTXREF),
@@ -28,7 +28,7 @@ pub(crate) fn startxref_tail<X: Clone + Copy + HasTracableInfo>(input: Span<X>) 
 }
 
 #[tracable_parser]
-fn xref_entries<X: Clone+ HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, X> {
+fn xref_entries<X: Clone + HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, X> {
     let (remainder, obj_index_offset) = character::complete::u32(input)?;
     let (remainder, _) = character::complete::multispace0(remainder)?;
     let (remainder, obj_count) = character::complete::u32(remainder)?;
@@ -79,8 +79,33 @@ pub(crate) fn xref_table<X: Clone + HasTracableInfo>(input: Span<X>) -> CbParseR
     Ok((remainder, entries_flatten))
 }
 
+pub(crate) fn xref_stream<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, X> {
+    let (remainder, obj) = object::indirect_object(input)?;
+    let data = if let Object::Indirect(IndirectObject { object: obj, .. }) = obj {
+        if let Object::Stream(Stream { dictionary: _, data }) = *obj {
+            data.0
+        } else {
+            panic!("TODO")
+        }
+    } else {
+        panic!("TODO")
+    };
+    log::trace!("Parse Xref stream data");
+    // FIXME: map error to custom error.
+    let (empty, table) = xref_table::<TracableInfo>((&data[..]).into()).unwrap();
+    debug_assert!(empty.len() == 0);
+    log::trace!("xref stream data parsed");
+
+    Ok((remainder, table))
+}
+
 #[tracable_parser]
-pub(crate) fn eof_marker_tail<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<(), X> {
+pub fn xref<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, X> {
+    branch::alt((xref_table, xref_stream))(input)
+}
+
+#[tracable_parser]
+pub fn eof_marker_tail<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<(), X> {
     // trailing bytes that follow the EOF marker are not possible since the limit we
     // provided is the length of the EOF marker
     let (remainder, _trailing) = backward_search::<_, _, _, CbParseError<Span<X>>>(

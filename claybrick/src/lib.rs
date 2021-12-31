@@ -7,7 +7,7 @@ use parse::parse;
 use pdf::Pdf;
 
 mod error;
-mod parse;
+pub mod parse;
 mod pdf;
 
 /// Read a PDF file and return the parsed `Pdf`.

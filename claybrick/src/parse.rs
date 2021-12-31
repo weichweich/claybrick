@@ -6,11 +6,13 @@ use crate::pdf::Pdf;
 
 use self::error::{CbParseError, CbParseErrorKind};
 
+pub use self::xref::{eof_marker_tail, xref, startxref_tail};
+
 pub mod error;
 mod object;
 mod xref;
 
-type Span<'a, X> = LocatedSpan<&'a [u8], X>;
+pub type Span<'a, X> = LocatedSpan<&'a [u8], X>;
 type CbParseResult<'a, O, X> = IResult<Span<'a, X>, O, error::CbParseError<Span<'a, X>>>;
 
 #[tracable_parser]

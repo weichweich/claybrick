@@ -21,3 +21,6 @@ trace = ["nom-tracable/trace"]
 
 [[example]]
 name = "trace"
+
+[[example]]
+name = "read_xref"
