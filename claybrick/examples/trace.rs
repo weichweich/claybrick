@@ -16,12 +16,12 @@ pub fn main() {
     env_logger::init();
 
     let pdf = claybrick::read_file(opt.input.as_path());
-    let pdf =  match pdf {
+    let pdf = match pdf {
         Ok(pdf) => pdf,
         Err(e) => {
             log::error!("Error while parsing: {:?}", e);
-            return
-        },
+            return;
+        }
     };
 
     histogram();

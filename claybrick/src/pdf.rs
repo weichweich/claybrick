@@ -4,15 +4,15 @@ pub use self::{
     array::Array,
     indirect::{IndirectObject, Reference},
     name::Name,
-    string::CbString,
     stream::Stream,
+    string::CbString,
 };
 
 mod array;
 mod indirect;
 mod name;
-mod string;
 mod stream;
+mod string;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pdf {
@@ -63,7 +63,10 @@ impl Display for Object {
             Object::Array(obj) => obj.fmt(f),
             //TODO: implement display
             Object::Dictionary(_obj) => write!(f, "dict"),
-            Object::Stream(Stream{dictionary: _dict, data: _data}) => write!(f, "Stream {{}}"),
+            Object::Stream(Stream {
+                dictionary: _dict,
+                data: _data,
+            }) => write!(f, "Stream {{}}"),
             Object::Null => write!(f, "NULL"),
             Object::Indirect(obj) => obj.fmt(f),
             Object::Reference(obj) => write!(f, "{:?}", obj),
@@ -150,7 +153,6 @@ impl std::fmt::Display for Bytes {
 }
 
 pub type Dictionary = HashMap<Name, Object>;
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XrefTableEntry {

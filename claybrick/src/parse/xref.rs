@@ -1,5 +1,5 @@
 use nom::{branch, bytes, character, combinator, multi};
-use nom_tracable::{tracable_parser, HasTracableInfo, TracableInfo};
+use nom_tracable::tracable_parser;
 
 use crate::pdf::{IndirectObject, Object, Stream, XrefTableEntry};
 
@@ -13,8 +13,8 @@ const EOF_MARKER: &[u8] = b"%%EOF";
 const STARTXREF: &[u8] = b"startxref";
 
 #[tracable_parser]
-pub fn startxref_tail<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<usize, X> {
-    let (remainder, (trailing, _)) = backward_search::<_, _, _, CbParseError<Span<X>>>(
+pub fn startxref_tail(input: Span) -> CbParseResult<usize> {
+    let (remainder, (trailing, _)) = backward_search::<_, _, _, CbParseError<Span>>(
         STARTXREF.len() + 2048,
         bytes::complete::tag_no_case(STARTXREF),
     )(input)?;
@@ -28,14 +28,15 @@ pub fn startxref_tail<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbPa
 }
 
 #[tracable_parser]
-fn xref_entries<X: Clone + HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, X> {
+fn xref_entries(input: Span) -> CbParseResult<Vec<XrefTableEntry>> {
     let (remainder, obj_index_offset) = character::complete::u32(input)?;
     let (remainder, _) = character::complete::multispace0(remainder)?;
     let (remainder, obj_count) = character::complete::u32(remainder)?;
     let (remainder, _) = character::complete::multispace0(remainder)?;
 
-    // FIXME: is it fine to just take a user defined value and request memory like that? Might be a way to crash software?
-    // FIXME: Iterate on convertion error handling (is 5 a good default?)
+    // FIXME: is it fine to just take a user defined value and request memory like
+    // that? Might be a way to crash software? FIXME: Iterate on convertion
+    // error handling (is 5 a good default?)
     let mut entries = Vec::<XrefTableEntry>::with_capacity(obj_count.try_into().unwrap_or(5));
 
     let mut remainder = remainder;
@@ -65,7 +66,7 @@ fn xref_entries<X: Clone + HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec
 }
 
 #[tracable_parser]
-pub(crate) fn xref_table<X: Clone + HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, X> {
+pub(crate) fn xref_table(input: Span) -> CbParseResult<Vec<XrefTableEntry>> {
     // xref keyword
     let (remainder, _) = character::complete::multispace0(input)?;
     let (remainder, _) = bytes::complete::tag(b"xref")(remainder)?;
@@ -79,7 +80,7 @@ pub(crate) fn xref_table<X: Clone + HasTracableInfo>(input: Span<X>) -> CbParseR
     Ok((remainder, entries_flatten))
 }
 
-pub(crate) fn xref_stream<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, X> {
+pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefTableEntry>> {
     let (remainder, obj) = object::indirect_object(input)?;
     let data = if let Object::Indirect(IndirectObject { object: obj, .. }) = obj {
         if let Object::Stream(Stream { dictionary: _, data }) = *obj {
@@ -92,7 +93,7 @@ pub(crate) fn xref_stream<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> 
     };
     log::trace!("Parse Xref stream data");
     // FIXME: map error to custom error.
-    let (empty, table) = xref_table::<TracableInfo>((&data[..]).into()).unwrap();
+    let (empty, table) = xref_table((&data[..]).into()).unwrap();
     debug_assert!(empty.len() == 0);
     log::trace!("xref stream data parsed");
 
@@ -100,15 +101,15 @@ pub(crate) fn xref_stream<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> 
 }
 
 #[tracable_parser]
-pub fn xref<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<Vec<XrefTableEntry>, X> {
+pub fn xref(input: Span) -> CbParseResult<Vec<XrefTableEntry>> {
     branch::alt((xref_table, xref_stream))(input)
 }
 
 #[tracable_parser]
-pub fn eof_marker_tail<X: Clone + Copy + HasTracableInfo>(input: Span<X>) -> CbParseResult<(), X> {
+pub fn eof_marker_tail(input: Span) -> CbParseResult<()> {
     // trailing bytes that follow the EOF marker are not possible since the limit we
     // provided is the length of the EOF marker
-    let (remainder, _trailing) = backward_search::<_, _, _, CbParseError<Span<X>>>(
+    let (remainder, _trailing) = backward_search::<_, _, _, CbParseError<Span>>(
         EOF_MARKER.len() + 4,
         bytes::complete::tag_no_case(EOF_MARKER),
     )(input)?;
@@ -123,11 +124,11 @@ mod tests {
     #[test]
     fn test_startxref_tail() {
         let input = &b"         startxref\n2132"[..];
-        let res = startxref_tail::<TracableInfo>(input.into());
+        let res = startxref_tail(input.into());
         assert!(matches!(res, Ok((_, 2132))));
 
         let input = &b"         startxref\n555\nasdfsadfasdfsadfasdfsadfsadf"[..];
-        let res = startxref_tail::<TracableInfo>(input.into());
+        let res = startxref_tail(input.into());
         assert!(matches!(res, Ok((_, 555))));
     }
 
@@ -135,7 +136,7 @@ mod tests {
     fn test_invalid_startxref_tail() {
         // to big
         let input = &b"         startxref\n9999999999999999999999999999999"[..];
-        let res = startxref_tail::<TracableInfo>(input.into());
+        let res = startxref_tail(input.into());
         assert!(matches!(res, Err(nom::Err::Error(_))));
     }
 }

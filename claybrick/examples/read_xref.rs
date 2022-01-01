@@ -27,8 +27,7 @@ pub fn main() {
     let (remainder_xref, _) = claybrick::parse::eof_marker_tail(input).unwrap();
     let (_, startxref) = claybrick::parse::startxref_tail(remainder_xref).unwrap();
 
-    let (remainder_xref, _) =
-        nom::bytes::complete::take::<_, _, CbParseError<Span<TracableInfo>>>(startxref)(input).unwrap();
+    let (remainder_xref, _) = nom::bytes::complete::take::<_, _, CbParseError<Span>>(startxref)(input).unwrap();
     let (_, xref) = claybrick::parse::xref(remainder_xref).unwrap();
 
     histogram();
