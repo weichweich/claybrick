@@ -51,6 +51,24 @@ pub enum Object {
     Reference(Reference),
 }
 
+impl Object {
+    pub fn indirect(&self) -> Option<&IndirectObject> {
+        if let Object::Indirect(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
+    pub fn stream(&self) -> Option<&Stream> {
+        if let Object::Stream(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+}
+
 impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

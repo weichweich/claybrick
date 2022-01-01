@@ -82,18 +82,17 @@ pub(crate) fn xref_table(input: Span) -> CbParseResult<Vec<XrefTableEntry>> {
 
 pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefTableEntry>> {
     let (remainder, obj) = object::indirect_object(input)?;
-    let data = if let Object::Indirect(IndirectObject { object: obj, .. }) = obj {
-        if let Object::Stream(Stream { dictionary: _, data }) = *obj {
-            data.0
-        } else {
-            panic!("TODO")
-        }
-    } else {
-        panic!("TODO")
-    };
+    let stream = obj
+        .indirect()
+        .ok_or_else(|| nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid)))?
+        .object
+        .stream()
+        .ok_or_else(|| nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid)))?
+        .filtered_data();
     log::trace!("Parse Xref stream data");
-    // FIXME: map error to custom error.
-    let (empty, table) = xref_table((&data[..]).into()).unwrap();
+
+    let (empty, table) = xref_table((&stream[..]).into())
+        .map_err(|_| nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid)))?;
     debug_assert!(empty.len() == 0);
     log::trace!("xref stream data parsed");
 

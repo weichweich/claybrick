@@ -4,6 +4,8 @@ use nom::error::{ErrorKind, ParseError};
 pub enum CbParseErrorKind {
     StartxrefInvalid,
     BackwardSearchNotFound,
+    // TODO: More detailed errors
+    XrefInvalid,
     Nom(ErrorKind),
 }
 
