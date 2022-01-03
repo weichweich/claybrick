@@ -237,7 +237,7 @@ pub(crate) fn stream_object(input: Span) -> CbParseResult<Stream> {
     // streams from beginning with \n.
     let (remainder, _) = branch::alt((bytes::complete::tag("\r\n"), bytes::complete::tag("\n")))(remainder)?;
 
-    let length = match dict.get(&b"Length".to_vec().into()) {
+    let length = match dict.get(&b"Length"[..]) {
         Some(Object::Integer(length)) => *length,
         l => {
             log::warn!("ignoring length object: {:?}", l);

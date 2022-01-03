@@ -72,7 +72,7 @@ pub(crate) fn parse(input: Span) -> CbParseResult<Pdf> {
         Pdf {
             version,
             announced_binary,
-            objects: objects,
+            objects,
             startxref,
             xref,
         },

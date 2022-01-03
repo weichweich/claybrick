@@ -1,7 +1,19 @@
-use std::ops::Deref;
+use std::{borrow::Borrow, ops::Deref};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Name(Vec<u8>);
+
+impl Name {
+    pub const fn new(n: Vec<u8>) -> Self {
+        Self(n)
+    }
+}
+
+impl Borrow<[u8]> for Name {
+    fn borrow(&self) -> &[u8] {
+        &self.0[..]
+    }
+}
 
 impl From<Vec<u8>> for Name {
     fn from(v: Vec<u8>) -> Self {

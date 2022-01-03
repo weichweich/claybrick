@@ -8,11 +8,11 @@ pub use self::{
     string::CbString,
 };
 
-mod array;
-mod indirect;
-mod name;
-mod stream;
-mod string;
+pub mod array;
+pub mod indirect;
+pub mod name;
+pub mod stream;
+pub mod string;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pdf {
@@ -52,6 +52,14 @@ pub enum Object {
 }
 
 impl Object {
+    pub fn name(&self) -> Option<&Name> {
+        if let Object::Name(n) = self {
+            Some(n)
+        } else {
+            None
+        }
+    }
+
     pub fn indirect(&self) -> Option<&IndirectObject> {
         if let Object::Indirect(s) = self {
             Some(s)
@@ -63,6 +71,14 @@ impl Object {
     pub fn stream(&self) -> Option<&Stream> {
         if let Object::Stream(s) = self {
             Some(s)
+        } else {
+            None
+        }
+    }
+
+    pub fn dictionary(&self) -> Option<&Dictionary> {
+        if let Object::Dictionary(d) = self {
+            Some(d)
         } else {
             None
         }
@@ -167,6 +183,12 @@ impl std::fmt::Display for Bytes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let limited_length = self.len().min(15);
         write!(f, "{}", &String::from_utf8_lossy(&self.0[..limited_length]))
+    }
+}
+
+impl std::borrow::Borrow<[u8]> for Bytes {
+    fn borrow(&self) -> &[u8] {
+        &self.0[..]
     }
 }
 

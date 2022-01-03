@@ -1,7 +1,7 @@
 use nom::{branch, bytes, character, combinator, multi};
 use nom_tracable::tracable_parser;
 
-use crate::pdf::{IndirectObject, Object, Stream, XrefTableEntry};
+use crate::pdf::XrefTableEntry;
 
 use super::{
     backward_search,
@@ -88,7 +88,8 @@ pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefTableEntry>> {
         .object
         .stream()
         .ok_or_else(|| nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid)))?
-        .filtered_data();
+        .filtered_data()
+        .map_err(|err| nom::Err::Error(CbParseError::new(input, CbParseErrorKind::StreamError(err))))?;
     log::trace!("Parse Xref stream data");
 
     let (empty, table) = xref_table((&stream[..]).into())
