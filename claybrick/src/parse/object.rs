@@ -12,7 +12,7 @@ use crate::{
     pdf::{Array, Dictionary, IndirectObject, Name, Object, Reference, Stream},
 };
 
-use super::CbParseResult;
+use super::{error::CbParseError, CbParseResult};
 
 const TRUE_OBJECT: &str = "true";
 const FALSE_OBJECT: &str = "false";
@@ -212,6 +212,9 @@ pub(crate) fn array_object(input: Span) -> CbParseResult<Array> {
 
 fn stream_by_length(length: usize, input: Span) -> CbParseResult<Vec<u8>> {
     let (remainder, data) = combinator::map(take(length), |b: Span| b.to_vec())(input)?;
+    let remainder = character::complete::line_ending::<_, CbParseError<Span>>(remainder)
+        .map(|(r, _)| r)
+        .unwrap_or(remainder);
     let (remainder, _) = bytes::complete::tag(b"endstream")(remainder)?;
     let (remainder, _) = require_termination(remainder)?;
 
