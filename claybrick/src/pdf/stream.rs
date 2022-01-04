@@ -41,6 +41,8 @@ impl Stream {
 pub mod filter {
     use std::borrow::Borrow;
 
+    use flate2::{Decompress, FlushDecompress, Status};
+
     use crate::pdf::{Bytes, Dictionary, Name};
 
     const FILTER_ASCII_HEX: &[u8] = b"ASCIIHexDecode";
@@ -67,7 +69,7 @@ pub mod filter {
             FILTER_ASCII_HEX => decode_ascii_hex(data.borrow()),
             FILTER_ASCII_85 => Err(FilterError::UnsupportedFilter(FILTER_ASCII_85.to_vec().into())),
             FILTER_LZW => Err(FilterError::UnsupportedFilter(FILTER_LZW.to_vec().into())),
-            FILTER_FLATE => Err(FilterError::UnsupportedFilter(FILTER_FLATE.to_vec().into())),
+            FILTER_FLATE => decode_flate(data),
             FILTER_RUN_LENGTH => Err(FilterError::UnsupportedFilter(FILTER_RUN_LENGTH.to_vec().into())),
             FILTER_CCITT_FAX => Err(FilterError::UnsupportedFilter(FILTER_CCITT_FAX.to_vec().into())),
             FILTER_JBIG2 => Err(FilterError::UnsupportedFilter(FILTER_JBIG2.to_vec().into())),
@@ -110,6 +112,26 @@ pub mod filter {
             }
         }
         Ok(buffer.into())
+    }
+
+    fn decode_flate(data: &Bytes) -> Result<Bytes, FilterError> {
+        let mut d = Decompress::new(true);
+        let mut out = Vec::<u8>::with_capacity(2 * 1024 * 1024);
+        while Status::StreamEnd
+            != d.decompress_vec(&data[..], &mut out, FlushDecompress::None)
+                .map_err(|err| {
+                    log::error!(
+                        "Error while applying {} filter: {:?}",
+                        String::from_utf8_lossy(FILTER_FLATE),
+                        err
+                    );
+                    FilterError::InvalidData
+                })?
+        {
+            out.reserve(2 * 1024 * 1024);
+        }
+
+        Ok(out.into())
     }
 
     #[cfg(test)]
