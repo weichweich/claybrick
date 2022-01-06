@@ -32,5 +32,5 @@ pub fn main() {
 
     histogram();
 
-    println!("{:?}", xref);
+    println!("{:#?}", xref);
 }

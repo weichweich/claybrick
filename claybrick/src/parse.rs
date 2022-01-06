@@ -110,7 +110,7 @@ mod tests {
     use nom_tracable::TracableInfo;
 
     use super::*;
-    use crate::pdf::{Dictionary, IndirectObject, Object, Reference, XrefTableEntry};
+    use crate::pdf::{Dictionary, IndirectObject, Object, Reference, Xref, XrefTableEntry};
 
     #[test]
     fn test_backward_search() {
@@ -178,7 +178,7 @@ startxref
                 version: (1, 7),
                 announced_binary: true,
                 startxref: 134,
-                xref: vec![
+                xref: Xref::Table(vec![
                     XrefTableEntry {
                         object: 0,
                         byte_offset: 3,
@@ -215,7 +215,7 @@ startxref
                         generation: 0,
                         free: false
                     }
-                ],
+                ]),
                 objects: vec![
                     Object::Indirect(IndirectObject {
                         index: 1,

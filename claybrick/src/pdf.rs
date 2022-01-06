@@ -20,7 +20,7 @@ pub struct Pdf {
     pub(crate) announced_binary: bool,
     pub(crate) objects: Vec<Object>,
     pub(crate) startxref: usize,
-    pub(crate) xref: Vec<XrefTableEntry>,
+    pub(crate) xref: Xref,
 }
 
 impl Display for Pdf {
@@ -79,6 +79,22 @@ impl Object {
     pub fn dictionary(&self) -> Option<&Dictionary> {
         if let Object::Dictionary(d) = self {
             Some(d)
+        } else {
+            None
+        }
+    }
+
+    pub fn array(&self) -> Option<&Array> {
+        if let Object::Array(a) = self {
+            Some(a)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn integer(&self) -> Option<i32> {
+        if let Object::Integer(i) = self {
+            Some(*i)
         } else {
             None
         }
@@ -201,4 +217,95 @@ pub struct XrefTableEntry {
     pub generation: u32,
     /// Marks objects that are not in use/deleted as free.
     pub free: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FreeObject {
+    /// Number of this object
+    pub number: usize,
+    /// Next generation number that should be used
+    pub gen: usize,
+    /// Next free object number
+    pub next_free: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UsedObject {
+    /// Number of this object
+    pub number: usize,
+    /// The position of this object in the pdf file in bytes, starting from the beginning of the PDF.
+    pub byte_offset: usize,
+    /// Next generation number that should be used
+    pub gen: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UsedCompressedObject {
+    /// Number of this object
+    pub number: usize,
+    /// The number of the stream object that contains this object
+    pub containing_object: usize,
+    /// Next generation number that should be used
+    pub index: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Unsupported {
+    /// Number of this object
+    pub number: usize,
+    /// The number of the stream object that contains this object
+    pub type_num: usize,
+    /// The number of the stream object that contains this object
+    pub w1: usize,
+    /// Next generation number that should be used
+    pub w2: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum XrefStreamEntry {
+    Free(FreeObject),
+    Used(UsedObject),
+    /// Object is stored in compressed stream
+    UsedCompressed(UsedCompressedObject),
+
+    /// Unsupported xref entry. Point to null object.
+    Unsupported(Unsupported),
+}
+
+impl XrefStreamEntry {
+    pub fn type_num(&self) -> usize {
+        match self {
+            XrefStreamEntry::Free(_) => 0,
+            XrefStreamEntry::Used(_) => 1,
+            XrefStreamEntry::UsedCompressed(_) => 2,
+            XrefStreamEntry::Unsupported(Unsupported { type_num, .. }) => *type_num,
+        }
+    }
+
+    pub fn number(&self) -> usize {
+        return match self {
+            XrefStreamEntry::Free(FreeObject { number, .. }) => *number,
+            XrefStreamEntry::Used(UsedObject { number, .. }) => *number,
+            XrefStreamEntry::UsedCompressed(UsedCompressedObject { number, .. }) => *number,
+            XrefStreamEntry::Unsupported(Unsupported { number, .. }) => *number,
+        };
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Xref {
+    Table(Vec<XrefTableEntry>),
+    Stream(Vec<XrefStreamEntry>),
+}
+
+impl From<Vec<XrefTableEntry>> for Xref {
+    fn from(v: Vec<XrefTableEntry>) -> Self {
+        Xref::Table(v)
+    }
+}
+
+impl From<Vec<XrefStreamEntry>> for Xref {
+    fn from(v: Vec<XrefStreamEntry>) -> Self {
+        Xref::Stream(v)
+    }
 }
