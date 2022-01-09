@@ -107,6 +107,8 @@ pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<
     let mut index: usize = 0;
     while remainder.len() >= entry_len {
         let (r, entry) = entry_parser(remainder)?;
+
+        // TODO: replace magic type number with constants
         entries.push(match entry {
             // type 1 entry (free object)
             (0, next_free, gen) => XrefStreamEntry::Free(FreeObject {

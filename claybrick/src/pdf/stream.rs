@@ -30,7 +30,7 @@ impl Stream {
         for f in self.filters()? {
             out_data = filter::filter(
                 f,
-                self.dictionary.get(FILTER_PARAM).map(Object::dictionary).flatten(),
+                self.dictionary.get(FILTER_PARAM).and_then(Object::dictionary),
                 &out_data,
             )?;
         }
@@ -117,16 +117,18 @@ pub mod filter {
     fn decode_flate(data: &Bytes) -> Result<Bytes, FilterError> {
         let mut d = Decompress::new(true);
         let mut out = Vec::<u8>::with_capacity(2 * 1024 * 1024);
+        let into_invalid_data_err = |err| {
+            log::error!(
+                "Error while applying {} filter: {:?}",
+                String::from_utf8_lossy(FILTER_FLATE),
+                err
+            );
+            FilterError::InvalidData
+        };
+
         while Status::StreamEnd
             != d.decompress_vec(&data[..], &mut out, FlushDecompress::None)
-                .map_err(|err| {
-                    log::error!(
-                        "Error while applying {} filter: {:?}",
-                        String::from_utf8_lossy(FILTER_FLATE),
-                        err
-                    );
-                    FilterError::InvalidData
-                })?
+                .map_err(into_invalid_data_err)?
         {
             out.reserve(2 * 1024 * 1024);
         }

@@ -4,12 +4,16 @@ use nom_tracable::{tracable_parser, TracableInfo};
 
 use crate::pdf::Pdf;
 
-use self::error::{CbParseError, CbParseErrorKind};
+use self::{
+    error::{CbParseError, CbParseErrorKind},
+    trailer::trailer_tail,
+};
 
 pub use self::xref::{eof_marker_tail, startxref_tail, xref};
 
 pub mod error;
 mod object;
+mod trailer;
 mod xref;
 
 pub type Span<'a> = LocatedSpan<&'a [u8], TracableInfo>;
@@ -60,9 +64,10 @@ pub(crate) fn parse(input: Span) -> CbParseResult<Pdf> {
     // NOTE: no need to read all objects, we could parse xref table first.
     let (_, objects) = object::object0(remainder_obj)?;
 
-    // find start of the xref section
+    // find start of the xref section and trailer
     let (remainder_xref, _) = xref::eof_marker_tail(input)?;
-    let (_, startxref) = xref::startxref_tail(remainder_xref)?;
+    let (remainder_xref, startxref) = xref::startxref_tail(remainder_xref)?;
+    let (_, trailer) = trailer_tail(remainder_xref)?;
 
     let (remainder_xref, _) = nom::bytes::complete::take(startxref)(input)?;
     let (_, xref) = xref::xref(remainder_xref)?;
@@ -73,8 +78,9 @@ pub(crate) fn parse(input: Span) -> CbParseResult<Pdf> {
             version,
             announced_binary,
             objects,
-            startxref,
             xref,
+            trailer,
+            startxref,
         },
     ))
 }
@@ -165,6 +171,8 @@ endobj
 xref
 0 6
 0000000003 65535 f\r\n0000000017 00000 n\r\n0000000081 00000 n\r\n0000000000 00007 f\r\n0000000331 00000 n\r\n0000000409 00000 n\r\n
+trailer
+<<>>
 startxref
 134
 %%EOF"
@@ -178,6 +186,7 @@ startxref
                 version: (1, 7),
                 announced_binary: true,
                 startxref: 134,
+                trailer: Dictionary::new(),
                 xref: Xref::Table(vec![
                     XrefTableEntry {
                         object: 0,

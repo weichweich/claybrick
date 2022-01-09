@@ -20,6 +20,7 @@ pub struct Pdf {
     pub(crate) announced_binary: bool,
     pub(crate) objects: Vec<Object>,
     pub(crate) startxref: usize,
+    pub(crate) trailer: Dictionary,
     pub(crate) xref: Xref,
 }
 
@@ -210,6 +211,7 @@ impl std::borrow::Borrow<[u8]> for Bytes {
 
 pub type Dictionary = HashMap<Name, Object>;
 
+// TODO move xref related things into a separate module
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XrefTableEntry {
     pub object: usize,
@@ -233,7 +235,8 @@ pub struct FreeObject {
 pub struct UsedObject {
     /// Number of this object
     pub number: usize,
-    /// The position of this object in the pdf file in bytes, starting from the beginning of the PDF.
+    /// The position of this object in the pdf file in bytes, starting from the
+    /// beginning of the PDF.
     pub byte_offset: usize,
     /// Next generation number that should be used
     pub gen: usize,
@@ -274,6 +277,7 @@ pub enum XrefStreamEntry {
 
 impl XrefStreamEntry {
     pub fn type_num(&self) -> usize {
+        // TODO: use constantants
         match self {
             XrefStreamEntry::Free(_) => 0,
             XrefStreamEntry::Used(_) => 1,
@@ -283,12 +287,12 @@ impl XrefStreamEntry {
     }
 
     pub fn number(&self) -> usize {
-        return match self {
+        match self {
             XrefStreamEntry::Free(FreeObject { number, .. }) => *number,
             XrefStreamEntry::Used(UsedObject { number, .. }) => *number,
             XrefStreamEntry::UsedCompressed(UsedCompressedObject { number, .. }) => *number,
             XrefStreamEntry::Unsupported(Unsupported { number, .. }) => *number,
-        };
+        }
     }
 }
 
