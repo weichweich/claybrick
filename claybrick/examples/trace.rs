@@ -26,5 +26,5 @@ pub fn main() {
 
     histogram();
 
-    println!("{}", pdf);
+    println!("{:#?}", pdf);
 }

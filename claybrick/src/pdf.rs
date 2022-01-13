@@ -14,25 +14,78 @@ pub mod name;
 pub mod stream;
 pub mod string;
 
+pub const K_SIZE: &[u8] = b"Size";
+pub const K_PREVIOUS: &[u8] = b"Prev";
+pub const K_ENCRYPT: &[u8] = b"Encrypt";
+pub const K_ROOT: &[u8] = b"Root";
+pub const K_ID: &[u8] = b"ID";
+pub const K_X_REF_STM: &[u8] = b"XRefStm";
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pdf {
     pub(crate) version: (u8, u8),
     pub(crate) announced_binary: bool,
+    pub(crate) sections: Vec<PdfSection>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PdfSection {
     pub(crate) objects: Vec<Object>,
     pub(crate) startxref: usize,
-    pub(crate) trailer: Dictionary,
+    pub(crate) trailer: Option<Trailer>,
     pub(crate) xref: Xref,
 }
 
-impl Display for Pdf {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Pdf {{")?;
-        write!(f, " version: {}.{}", self.version.0, self.version.1)?;
-        write!(f, ", binary: {}", self.announced_binary)?;
-        for obj in &self.objects {
-            write!(f, "\n  {}", obj)?;
-        }
-        write!(f, "}}")
+#[derive(Debug, Clone, PartialEq)]
+pub struct Trailer {
+    pub size: i32,
+    pub previous: Option<i32>,
+    pub root: Reference,
+    pub encrypt: Option<Object>,
+    pub info: Option<Dictionary>,
+    pub id: Option<[Bytes; 2]>,
+    pub x_ref_stm: Option<i32>,
+}
+
+impl TryFrom<Dictionary> for Trailer {
+    type Error = Dictionary;
+
+    fn try_from(value: Dictionary) -> Result<Self, Self::Error> {
+        // TODO: don't clone
+        Ok(Self {
+            size: value.get(K_SIZE).and_then(Object::integer).ok_or_else(|| {
+                log::error!("invalid size");
+                value.clone()
+            })?,
+
+            previous: value.get(K_PREVIOUS).and_then(Object::integer),
+
+            root: value
+                .get(K_ROOT)
+                .and_then(Object::reference)
+                .map(Clone::clone)
+                .ok_or_else(|| {
+                    log::error!("invalid root");
+                    value.clone()
+                })?,
+
+            encrypt: value.get(K_ENCRYPT).map(Clone::clone),
+
+            info: value.get(K_ROOT).and_then(Object::dictionary).map(Clone::clone),
+
+            id: value.get(K_ID).and_then(Object::array).and_then(|a| {
+                if a.len() == 2 {
+                    Some([
+                        a.get(0).and_then(Object::hex_string)?.clone(),
+                        a.get(1).and_then(Object::hex_string)?.clone(),
+                    ])
+                } else {
+                    None
+                }
+            }),
+
+            x_ref_stm: value.get(K_X_REF_STM).and_then(Object::integer),
+        })
     }
 }
 
@@ -93,9 +146,25 @@ impl Object {
         }
     }
 
-    pub(crate) fn integer(&self) -> Option<i32> {
+    pub fn integer(&self) -> Option<i32> {
         if let Object::Integer(i) = self {
             Some(*i)
+        } else {
+            None
+        }
+    }
+
+    pub fn reference(&self) -> Option<&Reference> {
+        if let Object::Reference(r) = self {
+            Some(r)
+        } else {
+            None
+        }
+    }
+
+    pub fn hex_string(&self) -> Option<&Bytes> {
+        if let Object::HexString(b) = self {
+            Some(b)
         } else {
             None
         }
@@ -179,8 +248,14 @@ impl From<Stream> for Object {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Bytes(pub Vec<u8>);
+
+impl std::fmt::Debug for Bytes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Bytes").field(&hex::encode(&self.0[..])).finish()
+    }
+}
 
 impl From<Vec<u8>> for Bytes {
     fn from(v: Vec<u8>) -> Self {

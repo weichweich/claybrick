@@ -2,7 +2,7 @@ use nom::{bytes, character, error::ParseError, IResult, InputIter, InputLength, 
 use nom_locate::LocatedSpan;
 use nom_tracable::{tracable_parser, TracableInfo};
 
-use crate::pdf::Pdf;
+use crate::pdf::{Pdf, PdfSection, Trailer};
 
 use self::{
     error::{CbParseError, CbParseErrorKind},
@@ -67,7 +67,16 @@ pub(crate) fn parse(input: Span) -> CbParseResult<Pdf> {
     // find start of the xref section and trailer
     let (remainder_xref, _) = xref::eof_marker_tail(input)?;
     let (remainder_xref, startxref) = xref::startxref_tail(remainder_xref)?;
-    let (_, trailer) = trailer_tail(remainder_xref)?;
+    let trailer = trailer_tail(remainder_xref)
+        .ok()
+        .map(|(_, trailer)| trailer)
+        .map(|t| Trailer::try_from(t))
+        .transpose()
+        .map_err(|e| {
+            log::error!("Invalid trailer: {:?}", e);
+            ()
+        })
+        .unwrap();
 
     let (remainder_xref, _) = nom::bytes::complete::take(startxref)(input)?;
     let (_, xref) = xref::xref(remainder_xref)?;
@@ -77,10 +86,12 @@ pub(crate) fn parse(input: Span) -> CbParseResult<Pdf> {
         Pdf {
             version,
             announced_binary,
-            objects,
-            xref,
-            trailer,
-            startxref,
+            sections: vec![PdfSection {
+                objects,
+                xref,
+                trailer,
+                startxref,
+            }],
         },
     ))
 }
@@ -116,7 +127,6 @@ mod tests {
     use nom_tracable::TracableInfo;
 
     use super::*;
-    use crate::pdf::{Dictionary, IndirectObject, Object, Reference, Xref, XrefTableEntry};
 
     #[test]
     fn test_backward_search() {
@@ -149,117 +159,5 @@ mod tests {
         let input = LocatedSpan::new_extra(b"%\xbf\xbf\xbf\xbf\xbf\n".as_bytes(), info);
 
         assert_eq!((true), binary_indicator(input).unwrap().1);
-    }
-
-    #[test]
-    fn test_parse() {
-        let info = TracableInfo::new().forward(true).backward(true);
-        let input = LocatedSpan::new_extra(
-            b"%PDF-1.7
-%\xbf\xbf\xbf\xbf\xbf
-1 0 obj
-<< /Type /Catalog
-    /Pages 2 0 R
->>
-endobj
-2 0 obj
-<< /Kids [3 0 R]
-    /Type /Pages
-    /Count 1
->>
-endobj
-xref
-0 6
-0000000003 65535 f\r\n0000000017 00000 n\r\n0000000081 00000 n\r\n0000000000 00007 f\r\n0000000331 00000 n\r\n0000000409 00000 n\r\n
-trailer
-<<>>
-startxref
-134
-%%EOF"
-            .as_bytes(),
-            info,
-        );
-
-        assert_eq!(
-            parse(input).unwrap().1,
-            Pdf {
-                version: (1, 7),
-                announced_binary: true,
-                startxref: 134,
-                trailer: Dictionary::new(),
-                xref: Xref::Table(vec![
-                    XrefTableEntry {
-                        object: 0,
-                        byte_offset: 3,
-                        generation: 65535,
-                        free: true
-                    },
-                    XrefTableEntry {
-                        object: 1,
-                        byte_offset: 17,
-                        generation: 0,
-                        free: false
-                    },
-                    XrefTableEntry {
-                        object: 2,
-                        byte_offset: 81,
-                        generation: 0,
-                        free: false
-                    },
-                    XrefTableEntry {
-                        object: 3,
-                        byte_offset: 0,
-                        generation: 7,
-                        free: true
-                    },
-                    XrefTableEntry {
-                        object: 4,
-                        byte_offset: 331,
-                        generation: 0,
-                        free: false
-                    },
-                    XrefTableEntry {
-                        object: 5,
-                        byte_offset: 409,
-                        generation: 0,
-                        free: false
-                    }
-                ]),
-                objects: vec![
-                    Object::Indirect(IndirectObject {
-                        index: 1,
-                        generation: 0,
-                        object: Box::new(Object::Dictionary(Dictionary::from([
-                            (b"Type".to_vec().into(), Object::Name(b"Catalog".to_vec().into())),
-                            (
-                                b"Pages".to_vec().into(),
-                                Object::Reference(Reference {
-                                    index: 2,
-                                    generation: 0
-                                })
-                            )
-                        ])))
-                    }),
-                    Object::Indirect(IndirectObject {
-                        index: 2,
-                        generation: 0,
-                        object: Box::new(Object::Dictionary(Dictionary::from([
-                            (
-                                b"Kids".to_vec().into(),
-                                Object::Array(
-                                    vec![Object::Reference(Reference {
-                                        index: 3,
-                                        generation: 0
-                                    })]
-                                    .into()
-                                )
-                            ),
-                            (b"Type".to_vec().into(), Object::Name(b"Pages".to_vec().into())),
-                            (b"Count".to_vec().into(), Object::Integer(1))
-                        ])))
-                    })
-                ]
-            }
-        )
     }
 }
