@@ -1,7 +1,7 @@
 use nom::{branch, bytes, character, combinator, error::ParseError, multi, sequence, AsBytes, IResult};
 use nom_tracable::tracable_parser;
 
-use crate::pdf::{FreeObject, Unsupported, UsedObject, Xref, XrefStreamEntry, XrefTableEntry};
+use crate::pdf::{FreeObject, Unsupported, UsedObject, Xref, XrefEntry};
 
 use super::{
     backward_search,
@@ -28,7 +28,7 @@ pub fn startxref_tail(input: Span) -> CbParseResult<usize> {
 }
 
 #[tracable_parser]
-fn xref_entries(input: Span) -> CbParseResult<Vec<XrefTableEntry>> {
+fn xref_entries(input: Span) -> CbParseResult<Vec<XrefEntry>> {
     let (remainder, obj_index_offset) = character::complete::u32(input)?;
     let (remainder, _) = character::complete::multispace0(remainder)?;
     let (remainder, obj_count) = character::complete::u32(remainder)?;
@@ -38,7 +38,7 @@ fn xref_entries(input: Span) -> CbParseResult<Vec<XrefTableEntry>> {
     // that? Might be a way to crash software?
 
     // FIXME: Iterate on convertion error handling (is 5 a good default?)
-    let mut entries = Vec::<XrefTableEntry>::with_capacity(obj_count.try_into().unwrap_or(5));
+    let mut entries = Vec::<XrefEntry>::with_capacity(obj_count.try_into().unwrap_or(5));
 
     let mut remainder = remainder;
     for i in 0..obj_count {
@@ -52,21 +52,34 @@ fn xref_entries(input: Span) -> CbParseResult<Vec<XrefTableEntry>> {
         ))(inner_rmndr)?;
         let (inner_rmndr, _) = character::complete::multispace0(inner_rmndr)?;
 
-        entries.push(XrefTableEntry {
-            // FIXME: no unwrap!
-            object: (obj_index_offset + i).try_into().unwrap(),
-            // FIXME: no unwrap!
-            byte_offset: offset.try_into().unwrap(),
-            generation: gen,
-            free,
-        });
+        let entry = if free {
+            XrefEntry::Free(FreeObject {
+                // FIXME: no unwrap!
+                number: (obj_index_offset + i).try_into().unwrap(),
+                // FIXME: no unwrap!
+                next_free: offset.try_into().unwrap(),
+                // FIXME: no unwrap!
+                generation: gen.try_into().unwrap(),
+            })
+        } else {
+            XrefEntry::Used(UsedObject {
+                // FIXME: no unwrap!
+                number: (obj_index_offset + i).try_into().unwrap(),
+                // FIXME: no unwrap!
+                byte_offset: offset.try_into().unwrap(),
+                // FIXME: no unwrap!
+                generation: gen.try_into().unwrap(),
+            })
+        };
+
+        entries.push(entry);
         remainder = inner_rmndr;
     }
 
     Ok((remainder, entries))
 }
 
-pub(crate) fn xref_section(input: Span) -> CbParseResult<Vec<XrefTableEntry>> {
+pub(crate) fn xref_section(input: Span) -> CbParseResult<Vec<XrefEntry>> {
     // xref keyword
     let (remainder, _) = character::complete::multispace0(input)?;
     let (remainder, _) = bytes::complete::tag(b"xref")(remainder)?;
@@ -99,9 +112,9 @@ fn xref_stream_entry<'a, E: ParseError<Span<'a>>>(
     )
 }
 
-pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<XrefStreamEntry>> {
+pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<XrefEntry>> {
     let entry_len: usize = w.iter().sum();
-    let mut entries = Vec::<XrefStreamEntry>::with_capacity(input.len() / entry_len);
+    let mut entries = Vec::<XrefEntry>::with_capacity(input.len() / entry_len);
     let mut remainder = input;
     let mut entry_parser = xref_stream_entry(w);
     let mut index: usize = 0;
@@ -111,28 +124,28 @@ pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<
         // TODO: replace magic type number with constants
         entries.push(match entry {
             // type 1 entry (free object)
-            (0, next_free, gen) => XrefStreamEntry::Free(FreeObject {
+            (0, next_free, gen) => XrefEntry::Free(FreeObject {
                 number: index,
-                gen,
+                generation: gen,
                 next_free,
             }),
 
             // type 2 entry (object position - byte offset)
-            (1, byte_offset, gen) => XrefStreamEntry::Used(UsedObject {
+            (1, byte_offset, gen) => XrefEntry::Used(UsedObject {
                 number: index,
                 byte_offset,
-                gen,
+                generation: gen,
             }),
 
             // type 3 entry (object position - compressed)
-            (2, next_free, gen) => XrefStreamEntry::Free(FreeObject {
+            (2, next_free, gen) => XrefEntry::Free(FreeObject {
                 number: index,
-                gen,
+                generation: gen,
                 next_free,
             }),
 
             // unsupported entry
-            (type_num, w1, w2) => XrefStreamEntry::Unsupported(Unsupported {
+            (type_num, w1, w2) => XrefEntry::Unsupported(Unsupported {
                 number: index,
                 type_num,
                 w1,
@@ -146,7 +159,7 @@ pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<
     Ok((b"".as_bytes().into(), entries))
 }
 
-pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefStreamEntry>> {
+pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefEntry>> {
     let (remainder, obj) = object::indirect_object(input)?;
 
     // get stream that is contained in the indirect object

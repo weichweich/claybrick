@@ -236,22 +236,15 @@ impl std::borrow::Borrow<[u8]> for Bytes {
 
 pub type Dictionary = HashMap<Name, Object>;
 
-// TODO move xref related things into a separate module
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XrefTableEntry {
-    pub object: usize,
-    pub byte_offset: usize,
-    pub generation: u32,
-    /// Marks objects that are not in use/deleted as free.
-    pub free: bool,
-}
+#[derive(Debug, Clone, PartialEq)]
+pub struct Xref(Vec<XrefEntry>);
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FreeObject {
     /// Number of this object
     pub number: usize,
     /// Next generation number that should be used
-    pub gen: usize,
+    pub generation: usize,
     /// Next free object number
     pub next_free: usize,
 }
@@ -264,7 +257,7 @@ pub struct UsedObject {
     /// beginning of the PDF.
     pub byte_offset: usize,
     /// Next generation number that should be used
-    pub gen: usize,
+    pub generation: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -290,7 +283,7 @@ pub struct Unsupported {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum XrefStreamEntry {
+pub enum XrefEntry {
     Free(FreeObject),
     Used(UsedObject),
     /// Object is stored in compressed stream
@@ -300,41 +293,29 @@ pub enum XrefStreamEntry {
     Unsupported(Unsupported),
 }
 
-impl XrefStreamEntry {
+impl XrefEntry {
     pub fn type_num(&self) -> usize {
         // TODO: use constantants
         match self {
-            XrefStreamEntry::Free(_) => 0,
-            XrefStreamEntry::Used(_) => 1,
-            XrefStreamEntry::UsedCompressed(_) => 2,
-            XrefStreamEntry::Unsupported(Unsupported { type_num, .. }) => *type_num,
+            XrefEntry::Free(_) => 0,
+            XrefEntry::Used(_) => 1,
+            XrefEntry::UsedCompressed(_) => 2,
+            XrefEntry::Unsupported(Unsupported { type_num, .. }) => *type_num,
         }
     }
 
     pub fn number(&self) -> usize {
         match self {
-            XrefStreamEntry::Free(FreeObject { number, .. }) => *number,
-            XrefStreamEntry::Used(UsedObject { number, .. }) => *number,
-            XrefStreamEntry::UsedCompressed(UsedCompressedObject { number, .. }) => *number,
-            XrefStreamEntry::Unsupported(Unsupported { number, .. }) => *number,
+            XrefEntry::Free(FreeObject { number, .. }) => *number,
+            XrefEntry::Used(UsedObject { number, .. }) => *number,
+            XrefEntry::UsedCompressed(UsedCompressedObject { number, .. }) => *number,
+            XrefEntry::Unsupported(Unsupported { number, .. }) => *number,
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Xref {
-    Table(Vec<XrefTableEntry>),
-    Stream(Vec<XrefStreamEntry>),
-}
-
-impl From<Vec<XrefTableEntry>> for Xref {
-    fn from(v: Vec<XrefTableEntry>) -> Self {
-        Xref::Table(v)
-    }
-}
-
-impl From<Vec<XrefStreamEntry>> for Xref {
-    fn from(v: Vec<XrefStreamEntry>) -> Self {
-        Xref::Stream(v)
+impl From<Vec<XrefEntry>> for Xref {
+    fn from(v: Vec<XrefEntry>) -> Self {
+        Xref(v)
     }
 }
