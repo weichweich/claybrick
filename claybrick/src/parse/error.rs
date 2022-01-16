@@ -2,14 +2,23 @@ use nom::error::{ErrorKind, ParseError};
 
 use crate::pdf::stream::filter::FilterError;
 
+use super::trailer::TrailerError;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CbParseErrorKind {
+    InvalidTrailer(TrailerError),
     StartxrefInvalid,
     BackwardSearchNotFound,
     // TODO: More detailed errors
     XrefInvalid,
     StreamError(FilterError),
     Nom(ErrorKind),
+}
+
+impl From<TrailerError> for CbParseErrorKind {
+    fn from(err: TrailerError) -> Self {
+        CbParseErrorKind::InvalidTrailer(err)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

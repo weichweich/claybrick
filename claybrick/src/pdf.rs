@@ -14,13 +14,6 @@ pub mod name;
 pub mod stream;
 pub mod string;
 
-pub const K_SIZE: &[u8] = b"Size";
-pub const K_PREVIOUS: &[u8] = b"Prev";
-pub const K_ENCRYPT: &[u8] = b"Encrypt";
-pub const K_ROOT: &[u8] = b"Root";
-pub const K_ID: &[u8] = b"ID";
-pub const K_X_REF_STM: &[u8] = b"XRefStm";
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pdf {
     pub(crate) version: (u8, u8),
@@ -31,7 +24,6 @@ pub struct Pdf {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PdfSection {
     pub(crate) objects: Vec<Object>,
-    pub(crate) startxref: usize,
     pub(crate) trailer: Option<Trailer>,
     pub(crate) xref: Xref,
 }
@@ -45,48 +37,6 @@ pub struct Trailer {
     pub info: Option<Dictionary>,
     pub id: Option<[Bytes; 2]>,
     pub x_ref_stm: Option<i32>,
-}
-
-impl TryFrom<Dictionary> for Trailer {
-    type Error = Dictionary;
-
-    fn try_from(value: Dictionary) -> Result<Self, Self::Error> {
-        // TODO: don't clone
-        Ok(Self {
-            size: value.get(K_SIZE).and_then(Object::integer).ok_or_else(|| {
-                log::error!("invalid size");
-                value.clone()
-            })?,
-
-            previous: value.get(K_PREVIOUS).and_then(Object::integer),
-
-            root: value
-                .get(K_ROOT)
-                .and_then(Object::reference)
-                .map(Clone::clone)
-                .ok_or_else(|| {
-                    log::error!("invalid root");
-                    value.clone()
-                })?,
-
-            encrypt: value.get(K_ENCRYPT).map(Clone::clone),
-
-            info: value.get(K_ROOT).and_then(Object::dictionary).map(Clone::clone),
-
-            id: value.get(K_ID).and_then(Object::array).and_then(|a| {
-                if a.len() == 2 {
-                    Some([
-                        a.get(0).and_then(Object::hex_string)?.clone(),
-                        a.get(1).and_then(Object::hex_string)?.clone(),
-                    ])
-                } else {
-                    None
-                }
-            }),
-
-            x_ref_stm: value.get(K_X_REF_STM).and_then(Object::integer),
-        })
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

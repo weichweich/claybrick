@@ -3,7 +3,7 @@ use std::{fs::File, io::Read};
 use error::CbError;
 use nom_locate::LocatedSpan;
 use nom_tracable::TracableInfo;
-use parse::parse;
+use parse::parse_complete;
 use pdf::Pdf;
 
 mod error;
@@ -22,7 +22,7 @@ pub fn read_file(file_path: &std::path::Path) -> Result<Pdf, CbError> {
     let info = TracableInfo::new().forward(true).backward(true);
     let span = LocatedSpan::new_extra(&buf[..], info);
 
-    let (_, pdf) = parse(span)?;
+    let (_, pdf) = parse_complete(span)?;
 
     Ok(pdf)
 }
