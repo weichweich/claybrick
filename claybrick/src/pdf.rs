@@ -1,4 +1,5 @@
 use std::{collections::HashMap, fmt::Display, ops::Deref};
+use fnv::FnvHashMap;
 
 pub use self::{
     array::Array,
@@ -23,20 +24,20 @@ pub struct Pdf {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PdfSection {
-    pub(crate) objects: Vec<Object>,
+    pub(crate) objects: FnvHashMap<usize, Object>,
     pub(crate) trailer: Option<Trailer>,
     pub(crate) xref: Xref,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Trailer {
-    pub size: i32,
-    pub previous: Option<i32>,
+    pub size: usize,
+    pub previous: Option<usize>,
     pub root: Reference,
     pub encrypt: Option<Object>,
     pub info: Option<Dictionary>,
     pub id: Option<[Bytes; 2]>,
-    pub x_ref_stm: Option<i32>,
+    pub x_ref_stm: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -239,6 +240,40 @@ pub type Dictionary = HashMap<Name, Object>;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Xref(Vec<XrefEntry>);
 
+impl Xref {
+    pub fn objects(&self) -> impl Iterator<Item = &UsedObject> {
+        self.0
+            .iter()
+            .filter_map(|entry| if let XrefEntry::Used(u) = entry { Some(u) } else { None })
+    }
+
+    pub fn compressed_objects(&self) -> impl Iterator<Item = &UsedCompressedObject> {
+        self.0.iter().filter_map(|entry| {
+            if let XrefEntry::UsedCompressed(u) = entry {
+                Some(u)
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn free_objects(&self) -> impl Iterator<Item = &FreeObject> {
+        self.0.iter().filter_map(|entry| {
+            if let XrefEntry::Free(u) = entry {
+                Some(u)
+            } else {
+                None
+            }
+        })
+    }
+}
+
+impl From<Vec<XrefEntry>> for Xref {
+    fn from(v: Vec<XrefEntry>) -> Self {
+        Xref(v)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FreeObject {
     /// Number of this object
@@ -311,11 +346,5 @@ impl XrefEntry {
             XrefEntry::UsedCompressed(UsedCompressedObject { number, .. }) => *number,
             XrefEntry::Unsupported(Unsupported { number, .. }) => *number,
         }
-    }
-}
-
-impl From<Vec<XrefEntry>> for Xref {
-    fn from(v: Vec<XrefEntry>) -> Self {
-        Xref(v)
     }
 }

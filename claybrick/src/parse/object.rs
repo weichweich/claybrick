@@ -261,7 +261,7 @@ pub(crate) fn stream_object(input: Span) -> CbParseResult<Stream> {
     ))
 }
 
-fn referred_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> CbParseResult<'a, Object> {
+pub(crate) fn referred_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> CbParseResult<'a, Object> {
     combinator::map(
         sequence::delimited(
             sequence::terminated(bytes::complete::tag(b"obj"), character::complete::multispace0),
@@ -278,7 +278,7 @@ fn referred_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> C
     )
 }
 
-fn reference_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> CbParseResult<'a, Object> {
+pub(crate) fn reference_object<'a>(index: u32, generation: u32) -> impl FnMut(Span<'a>) -> CbParseResult<'a, Object> {
     combinator::map(
         sequence::terminated(character::complete::char('R'), require_termination),
         move |_| Object::Reference(Reference { index, generation }),
@@ -303,7 +303,7 @@ pub(crate) fn object(input: Span) -> CbParseResult<Object> {
         into(array_object),
         string_object,
         // indirect object has to be tested before we try to parse an integer.
-        // `0 0 R` is an inderect object while `0 0` are two integers.
+        // `0 0 R` is an indirect object while `0 0` are two integers.
         indirect_object,
         number_object,
         bool_object,

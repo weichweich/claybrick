@@ -6,6 +6,7 @@ use crate::pdf::{Pdf, PdfSection};
 
 use self::{
     error::{CbParseError, CbParseErrorKind},
+    object::{indirect_object, object},
     trailer::trailer_tail,
 };
 
@@ -65,33 +66,62 @@ pub(crate) fn header(input: Span) -> CbParseResult<((u8, u8), bool)> {
 }
 
 #[tracable_parser]
-pub(crate) fn parse_complete(input: Span) -> CbParseResult<Pdf> {
-    let (_, (version, announced_binary)) = header(input)?;
-
+pub(crate) fn pdf_section(input: Span) -> CbParseResult<Vec<PdfSection>> {
     // find start of the xref section and trailer
-    let (xref, trailer) = {
-        let (remainder_xref, _) = xref::eof_marker_tail(input)?;
-        let (remainder_xref, startxref) = xref::startxref_tail(remainder_xref)?;
+    let (remainder_xref, _) = xref::eof_marker_tail(input)?;
+    let (remainder_xref, startxref) = xref::startxref_tail(remainder_xref)?;
+
+    let mut pdf_sections: Vec<PdfSection> = Vec::with_capacity(5);
+    let mut maybe_startxref: Option<usize> = Some(startxref);
+
+    while let Some(startxref) = maybe_startxref.take() {
+        log::debug!("Parse section {}", startxref);
+
         let trailer = trailer_tail(remainder_xref)
-            .map_err(|err| log::error!("Error in PDF trailer {:?}", err))
+            .map_err(|err| match err {
+                nom::Err::Error(CbParseError {
+                    kind: CbParseErrorKind::BackwardSearchNotFound,
+                    ..
+                }) => log::debug!("No trailer in PDF section"),
+                _ => log::error!("Error in trailer {:?}", err),
+            })
             .ok()
             .map(|(_, trailer)| trailer);
         let (remainder_xref, _) = nom::bytes::complete::take(startxref)(input)?;
         let (_, xref) = xref::xref(remainder_xref)?;
 
-        (xref, trailer)
-    };
+        let object_count = xref.objects().count();
+        let mut objects = fnv::FnvHashMap::with_capacity_and_hasher(object_count, Default::default());
+
+        for obj_xref in xref.objects() {
+            // we always use input since the byte_offset is from the start of the file and at random
+            log::debug!("Parse object {:?}", obj_xref);
+            let (obj_bytes, _) = bytes::complete::take(obj_xref.byte_offset)(input)?;
+            let (_, obj) = indirect_object(obj_bytes)?;
+
+            objects.insert(obj_xref.number, obj);
+        }
+
+        // The filter ensures that each new section is before the current one, thus preventing a loop.
+        maybe_startxref = trailer.as_ref().and_then(|t| t.previous).filter(|&new| new < startxref);
+        pdf_sections.push(PdfSection { objects, xref, trailer });
+    }
+
+    Ok((remainder_xref, pdf_sections))
+}
+
+#[tracable_parser]
+pub(crate) fn parse_complete(input: Span) -> CbParseResult<Pdf> {
+    let (_, (version, announced_binary)) = header(input)?;
+
+    let (_, sections) = pdf_section(input)?;
 
     Ok((
         input,
         Pdf {
             version,
             announced_binary,
-            sections: vec![PdfSection {
-                objects: vec![],
-                xref,
-                trailer,
-            }],
+            sections,
         },
     ))
 }

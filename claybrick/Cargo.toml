@@ -12,6 +12,7 @@ nom = "7.1.0"
 nom-tracable = "0.8"
 nom_locate = "4.0"
 hex = "0.4"
+fnv = "1.0"
 
 [dev-dependencies]
 env_logger = "0.9.0"

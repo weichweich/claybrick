@@ -16,6 +16,7 @@ pub const K_X_REF_STM: &[u8] = b"XRefStm";
 pub enum TrailerError {
     InvalidSize,
     InvalidRoot,
+    InvalidXRefStm,
 }
 
 fn into_trailer(dict: Dictionary) -> Result<Trailer, TrailerError> {
@@ -24,10 +25,17 @@ fn into_trailer(dict: Dictionary) -> Result<Trailer, TrailerError> {
         size: dict
             .get(K_SIZE)
             .and_then(Object::integer)
-            .ok_or(TrailerError::InvalidSize)?,
+            .ok_or(TrailerError::InvalidSize)?
+            .try_into()
+            .map_err(|_| TrailerError::InvalidSize)?,
 
         // TODO: Error for invalid previous
-        previous: dict.get(K_PREVIOUS).and_then(Object::integer),
+        previous: dict
+            .get(K_PREVIOUS)
+            .and_then(Object::integer)
+            .map(TryInto::try_into)
+            .transpose()
+            .unwrap(),
 
         root: dict
             .get(K_ROOT)
@@ -59,7 +67,12 @@ fn into_trailer(dict: Dictionary) -> Result<Trailer, TrailerError> {
         }),
 
         // TODO: Error for invalid XRefStm
-        x_ref_stm: dict.get(K_X_REF_STM).and_then(Object::integer),
+        x_ref_stm: dict
+            .get(K_X_REF_STM)
+            .and_then(Object::integer)
+            .map(TryInto::try_into)
+            .transpose()
+            .map_err(|_| TrailerError::InvalidXRefStm)?,
     })
 }
 
