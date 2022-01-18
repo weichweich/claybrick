@@ -4,7 +4,7 @@ use error::CbError;
 use nom_locate::LocatedSpan;
 use nom_tracable::TracableInfo;
 use parse::parse_complete;
-use pdf::Pdf;
+use pdf::RawPdf;
 
 mod error;
 pub mod parse;
@@ -14,7 +14,7 @@ mod pdf;
 ///
 /// Panics if the file cannot be read or the PDF cannot get parsed.
 /// TODO: don't panic.
-pub fn read_file(file_path: &std::path::Path) -> Result<Pdf, CbError> {
+pub fn read_file(file_path: &std::path::Path) -> Result<RawPdf, CbError> {
     let mut input_file = File::open(file_path)?;
     let mut buf = Vec::new();
     input_file.read_to_end(&mut buf)?;

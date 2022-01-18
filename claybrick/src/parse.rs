@@ -2,7 +2,7 @@ use nom::{bytes, character, error::ParseError, IResult, InputIter, InputLength, 
 use nom_locate::LocatedSpan;
 use nom_tracable::{tracable_parser, TracableInfo};
 
-use crate::pdf::{Pdf, PdfSection};
+use crate::pdf::{RawPdf, PdfSection};
 
 use self::{
     error::{CbParseError, CbParseErrorKind},
@@ -102,6 +102,8 @@ pub(crate) fn pdf_section(input: Span) -> CbParseResult<Vec<PdfSection>> {
             objects.insert(obj_xref.number, obj);
         }
 
+        // TODO: read compressed objects
+
         // The filter ensures that each new section is before the current one, thus preventing a loop.
         maybe_startxref = trailer.as_ref().and_then(|t| t.previous).filter(|&new| new < startxref);
         pdf_sections.push(PdfSection { objects, xref, trailer });
@@ -111,14 +113,14 @@ pub(crate) fn pdf_section(input: Span) -> CbParseResult<Vec<PdfSection>> {
 }
 
 #[tracable_parser]
-pub(crate) fn parse_complete(input: Span) -> CbParseResult<Pdf> {
+pub(crate) fn parse_complete(input: Span) -> CbParseResult<RawPdf> {
     let (_, (version, announced_binary)) = header(input)?;
 
     let (_, sections) = pdf_section(input)?;
 
     Ok((
         input,
-        Pdf {
+        RawPdf {
             version,
             announced_binary,
             sections,

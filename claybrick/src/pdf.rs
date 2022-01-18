@@ -1,5 +1,5 @@
-use std::{collections::HashMap, fmt::Display, ops::Deref};
 use fnv::FnvHashMap;
+use std::{collections::HashMap, fmt::Display, ops::Deref};
 
 pub use self::{
     array::Array,
@@ -16,10 +16,43 @@ pub mod stream;
 pub mod string;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Pdf {
+pub struct RawPdf {
     pub(crate) version: (u8, u8),
     pub(crate) announced_binary: bool,
     pub(crate) sections: Vec<PdfSection>,
+}
+
+impl RawPdf {
+    pub fn object(&self, num: usize) -> Option<&Object> {
+        self.sections.iter().find_map(|s| s.objects.get(&num))
+    }
+
+    pub fn catalog(&self) -> &Dictionary {
+        // TODO: enforce at-least-section assertion.
+        // TODO: enforce required-trailer assertion.
+        let root = &self
+            .sections
+            .first()
+            .expect("We always assert at least one section.")
+            .trailer
+            .as_ref()
+            .expect("A trailer is required.")
+            .root;
+        let catalog = self
+            .object(
+                root.index
+                    .try_into()
+                    .expect("TODO: replace u32 in data model with usize"),
+            )
+            .unwrap()
+            .indirect()
+            .unwrap()
+            .object
+            .dictionary()
+            .unwrap();
+
+        catalog
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -258,13 +291,9 @@ impl Xref {
     }
 
     pub fn free_objects(&self) -> impl Iterator<Item = &FreeObject> {
-        self.0.iter().filter_map(|entry| {
-            if let XrefEntry::Free(u) = entry {
-                Some(u)
-            } else {
-                None
-            }
-        })
+        self.0
+            .iter()
+            .filter_map(|entry| if let XrefEntry::Free(u) = entry { Some(u) } else { None })
     }
 }
 
