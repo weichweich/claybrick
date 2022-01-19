@@ -1,19 +1,11 @@
 use fnv::FnvHashMap;
 use std::{collections::HashMap, fmt::Display, ops::Deref};
 
-pub use self::{
-    array::Array,
-    indirect::{IndirectObject, Reference},
-    name::Name,
-    stream::Stream,
-    string::CbString,
-};
+pub use self::document::{Catalog, CatalogError};
+pub use self::object::{Array, CbString, IndirectObject, Name, Reference, Stream};
 
-pub mod array;
-pub mod indirect;
-pub mod name;
-pub mod stream;
-pub mod string;
+pub mod document;
+pub mod object;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RawPdf {
@@ -27,7 +19,7 @@ impl RawPdf {
         self.sections.iter().find_map(|s| s.objects.get(&num))
     }
 
-    pub fn catalog(&self) -> &Dictionary {
+    pub fn catalog(&self) -> Result<Catalog, CatalogError> {
         // TODO: enforce at-least-section assertion.
         // TODO: enforce required-trailer assertion.
         let root = &self
@@ -51,7 +43,7 @@ impl RawPdf {
             .dictionary()
             .unwrap();
 
-        catalog
+        Catalog::new_with(self, catalog)
     }
 }
 

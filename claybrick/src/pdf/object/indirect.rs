@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use super::Object;
+use crate::pdf::Object;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IndirectObject {

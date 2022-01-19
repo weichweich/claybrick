@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
-use super::Object;
+use crate::pdf::Object;
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array(Vec<Object>);

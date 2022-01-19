@@ -14,8 +14,8 @@ struct Opt {
 }
 
 pub fn main() {
-    let opt = Opt::from_args();
     env_logger::init();
+    let opt = Opt::from_args();
 
     let mut input_file = File::open(opt.input).unwrap();
     let mut buf = Vec::new();
