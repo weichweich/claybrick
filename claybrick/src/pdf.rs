@@ -45,6 +45,16 @@ impl RawPdf {
 
         Catalog::new_with(self, catalog)
     }
+
+    pub fn dereference(&self, reference: &Reference) -> Option<&Object> {
+        self.sections.iter().find_map(|s| {
+            s.objects
+                .get(&reference.index.try_into().unwrap())
+                .and_then(Object::indirect)
+                .filter(|io| io.generation == reference.generation)
+                .map(|io| &*io.object)
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

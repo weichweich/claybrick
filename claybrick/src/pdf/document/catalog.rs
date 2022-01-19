@@ -10,7 +10,7 @@ pub enum CatalogError {
     MissingPages,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Catalog<'a> {
     raw_pdf: &'a RawPdf,
     version: Option<&'a Name>,
@@ -43,6 +43,18 @@ pub struct Catalog<'a> {
     // needs_rendering: Option<bool>,
 }
 
+// Custom impl to skip `raw_pdf` field.
+impl<'a> std::fmt::Debug for Catalog<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Catalog")
+            .field("version", &self.version)
+            .field("pages", &self.pages)
+            .field("pages_label", &self.pages_label)
+            .field("names", &self.names)
+            .finish()
+    }
+}
+
 impl<'a> Catalog<'a> {
     pub(crate) fn new_with(raw_pdf: &'a RawPdf, dict: &'a Dictionary) -> Result<Self, CatalogError> {
         Ok(Self {
@@ -50,8 +62,16 @@ impl<'a> Catalog<'a> {
             version: dict.get(K_VERSION).and_then(Object::name),
             pages: dict
                 .get(K_PAGES)
+                .and_then(|o| match o {
+                    Object::Reference(r) => raw_pdf.dereference(r),
+                    other => Some(other),
+                })
                 .and_then(Object::dictionary)
-                .ok_or(CatalogError::MissingPages)?,
+                .ok_or(CatalogError::MissingPages)
+                .map_err(|e| {
+                    log::error!("Missing `{}` key. Got {:?}", String::from_utf8_lossy(K_PAGES), dict);
+                    e
+                })?,
             pages_label: dict.get(K_PAGES_LABEL).and_then(Object::dictionary),
             names: dict.get(K_NAME).and_then(Object::dictionary),
         })
