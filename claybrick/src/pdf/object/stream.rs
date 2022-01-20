@@ -1,6 +1,6 @@
 use self::filter::FilterError;
 
-use crate::pdf::{Bytes, Dictionary, object::Name, Object};
+use crate::pdf::{object::Name, Bytes, Dictionary, Object};
 
 const FILTER: &[u8] = b"Filter";
 const FILTER_PARAM: &[u8] = b"DecodeParms";
@@ -43,7 +43,7 @@ pub mod filter {
 
     use flate2::{Decompress, FlushDecompress, Status};
 
-    use crate::pdf::{Bytes, Dictionary, object::Name};
+    use crate::pdf::{object::Name, Bytes, Dictionary};
 
     const FILTER_ASCII_HEX: &[u8] = b"ASCIIHexDecode";
     const FILTER_ASCII_85: &[u8] = b"ASCII85Decode";

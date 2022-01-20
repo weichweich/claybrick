@@ -2,7 +2,7 @@ use nom::{bytes, character, error::ParseError, IResult, InputIter, InputLength, 
 use nom_locate::LocatedSpan;
 use nom_tracable::{tracable_parser, TracableInfo};
 
-use crate::pdf::{RawPdf, PdfSection};
+use crate::pdf::{PdfSection, RawPdf};
 
 use self::{
     error::{CbParseError, CbParseErrorKind},
@@ -94,7 +94,7 @@ pub(crate) fn pdf_section(input: Span) -> CbParseResult<Vec<PdfSection>> {
         let mut objects = fnv::FnvHashMap::with_capacity_and_hasher(object_count, Default::default());
 
         for obj_xref in xref.objects() {
-            // we always use input since the byte_offset is from the start of the file and at random
+            // we always use input since the byte_offset is from the start of the file
             log::debug!("Parse object {:?}", obj_xref);
             let (obj_bytes, _) = bytes::complete::take(obj_xref.byte_offset)(input)?;
             let (_, obj) = indirect_object(obj_bytes)?;
@@ -104,7 +104,8 @@ pub(crate) fn pdf_section(input: Span) -> CbParseResult<Vec<PdfSection>> {
 
         // TODO: read compressed objects
 
-        // The filter ensures that each new section is before the current one, thus preventing a loop.
+        // The filter ensures that each new section is before the current one, thus
+        // preventing a loop.
         maybe_startxref = trailer.as_ref().and_then(|t| t.previous).filter(|&new| new < startxref);
         pdf_sections.push(PdfSection { objects, xref, trailer });
     }

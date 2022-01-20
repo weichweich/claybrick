@@ -1,8 +1,10 @@
 use fnv::FnvHashMap;
 use std::{collections::HashMap, fmt::Display, ops::Deref};
 
-pub use self::document::{Catalog, CatalogError};
-pub use self::object::{Array, CbString, IndirectObject, Name, Reference, Stream};
+pub use self::{
+    document::{Catalog, CatalogError},
+    object::{Array, CbString, IndirectObject, Name, Reference, Stream},
+};
 
 pub mod document;
 pub mod object;
