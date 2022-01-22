@@ -72,7 +72,7 @@ pub struct Trailer {
     pub previous: Option<usize>,
     pub root: Reference,
     pub encrypt: Option<Object>,
-    pub info: Option<Dictionary>,
+    pub info: Option<Reference>,
     pub id: Option<[Bytes; 2]>,
     pub x_ref_stm: Option<usize>,
 }

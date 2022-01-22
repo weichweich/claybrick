@@ -11,6 +11,12 @@ impl Array {
     }
 }
 
+impl Default for Array {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Deref for Array {
     type Target = Vec<Object>;
 

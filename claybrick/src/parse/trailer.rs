@@ -15,32 +15,37 @@ pub const K_X_REF_STM: &[u8] = b"XRefStm";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TrailerError {
     InvalidSize,
+    MissingSize,
     InvalidRoot,
+    MissingRoot,
     InvalidXRefStm,
+    MissingXRefStm,
+    InvalidPrevious,
+    InvalidInfo,
+    InvalidId,
 }
 
 fn into_trailer(dict: Dictionary) -> Result<Trailer, TrailerError> {
     Ok(Trailer {
-        // TODO: Error for missing size
         size: dict
             .get(K_SIZE)
-            .and_then(Object::integer)
+            .ok_or(TrailerError::MissingSize)?
+            .integer()
             .ok_or(TrailerError::InvalidSize)?
             .try_into()
             .map_err(|_| TrailerError::InvalidSize)?,
 
-        // TODO: Error for invalid previous
         previous: dict
             .get(K_PREVIOUS)
             .and_then(Object::integer)
             .map(TryInto::try_into)
             .transpose()
-            .unwrap(),
+            .map_err(|_| TrailerError::InvalidPrevious)?,
 
         root: dict
             .get(K_ROOT)
-            // TODO: separate error for invalid or missing root
-            .and_then(Object::reference)
+            .ok_or(TrailerError::MissingRoot)?
+            .reference()
             // TODO: don't clone
             .map(Clone::clone)
             .ok_or(TrailerError::InvalidRoot)?,
@@ -49,27 +54,40 @@ fn into_trailer(dict: Dictionary) -> Result<Trailer, TrailerError> {
         encrypt: dict.get(K_ENCRYPT).map(Clone::clone),
 
         // TODO: don't clone
-        // TODO: Error for invalid info
-        info: dict.get(K_ROOT).and_then(Object::dictionary).map(Clone::clone),
+        info: dict
+            .get(K_ROOT)
+            .map(|o| o.reference().ok_or(TrailerError::InvalidInfo))
+            .transpose()?
+            .map(Clone::clone),
 
-        // TODO: Error for invalid id
-        id: dict.get(K_ID).and_then(Object::array).and_then(|a| {
-            if a.len() == 2 {
-                Some([
-                    // TODO: don't clone
-                    a.get(0).and_then(Object::hex_string)?.clone(),
-                    // TODO: don't clone
-                    a.get(1).and_then(Object::hex_string)?.clone(),
-                ])
-            } else {
-                None
-            }
-        }),
+        id: dict
+            .get(K_ID)
+            .map(|o| o.array().ok_or(TrailerError::InvalidId))
+            .transpose()?
+            .map(|a| {
+                if a.len() == 2 {
+                    Ok([
+                        // TODO: don't clone
+                        a.get(0)
+                            .and_then(Object::hex_string)
+                            .ok_or(TrailerError::InvalidId)?
+                            .clone(),
+                        // TODO: don't clone
+                        a.get(1)
+                            .and_then(Object::hex_string)
+                            .ok_or(TrailerError::InvalidId)?
+                            .clone(),
+                    ])
+                } else {
+                    Err(TrailerError::InvalidId)
+                }
+            })
+            .transpose()?,
 
-        // TODO: Error for invalid XRefStm
         x_ref_stm: dict
             .get(K_X_REF_STM)
-            .and_then(Object::integer)
+            .ok_or(TrailerError::MissingXRefStm)?
+            .integer()
             .map(TryInto::try_into)
             .transpose()
             .map_err(|_| TrailerError::InvalidXRefStm)?,

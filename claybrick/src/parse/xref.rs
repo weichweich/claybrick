@@ -1,6 +1,6 @@
 //! XRef Parsing.
 
-use nom::{branch, bytes, character, combinator, error::ParseError, multi, sequence, AsBytes, IResult};
+use nom::{branch, bytes, character, combinator, error::ParseError, multi, sequence, IResult};
 use nom_tracable::tracable_parser;
 
 use crate::{
