@@ -9,7 +9,7 @@ use crate::{
         error::{CbParseError, CbParseErrorKind},
         object, CbParseResult, Span,
     },
-    pdf::{FreeObject, Unsupported, UsedObject, Xref, XrefEntry, XREF_FREE, XREF_USED, XREF_COMPRESSED},
+    pdf::xref::{FreeObject, Unsupported, UsedObject, Xref, XrefEntry, XREF_FREE, XREF_USED, XREF_COMPRESSED},
 };
 
 const EOF_MARKER: &[u8] = b"%%EOF";
