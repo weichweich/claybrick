@@ -1,3 +1,5 @@
+//! XRef Parsing.
+
 use nom::{branch, bytes, character, combinator, error::ParseError, multi, sequence, AsBytes, IResult};
 use nom_tracable::tracable_parser;
 
@@ -12,6 +14,9 @@ use super::{
 const EOF_MARKER: &[u8] = b"%%EOF";
 const STARTXREF: &[u8] = b"startxref";
 
+/// Find and returns the position of the xref table/stream by searching for
+/// `startxref <number>` from the end of the input and parsing the number that
+/// follows.
 #[tracable_parser]
 pub fn startxref_tail(input: Span) -> CbParseResult<usize> {
     let (remainder, (trailing, _)) = backward_search::<_, _, _, CbParseError<Span>>(
@@ -27,6 +32,10 @@ pub fn startxref_tail(input: Span) -> CbParseResult<usize> {
     Ok((remainder, xref_pos))
 }
 
+/// Parse a section of the XRef table.
+///
+/// Retruns a vector of free objects or used objects that can be accessed by the
+/// byte offset.
 #[tracable_parser]
 fn xref_entries(input: Span) -> CbParseResult<Vec<XrefEntry>> {
     let (remainder, obj_index_offset) = character::complete::u32(input)?;
@@ -79,6 +88,10 @@ fn xref_entries(input: Span) -> CbParseResult<Vec<XrefEntry>> {
     Ok((remainder, entries))
 }
 
+/// Parses a complete xref section which starts with the `xref` keyword.
+///
+/// Retruns a vector of free objects or used objects that can be accessed by the
+/// byte offset.
 pub(crate) fn xref_section(input: Span) -> CbParseResult<Vec<XrefEntry>> {
     // xref keyword
     let (remainder, _) = character::complete::multispace0(input)?;
@@ -93,6 +106,9 @@ pub(crate) fn xref_section(input: Span) -> CbParseResult<Vec<XrefEntry>> {
     Ok((remainder, entries_flatten))
 }
 
+/// A stream entry consists of 3 numbers with variable length. This function
+/// takes the 3 length values and returns a parser that accepts 3 numbers with
+/// the supplied length.
 fn xref_stream_entry<'a, E: ParseError<Span<'a>>>(
     w: [usize; 3],
 ) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, (usize, usize, usize), E> {
@@ -112,6 +128,9 @@ fn xref_stream_entry<'a, E: ParseError<Span<'a>>>(
     )
 }
 
+/// Parses the xref-stream data.
+/// 
+/// `w` - the length of the three numbers in each stream entry.
 pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<XrefEntry>> {
     let entry_len: usize = w.iter().sum();
     let mut entries = Vec::<XrefEntry>::with_capacity(input.len() / entry_len);
@@ -159,6 +178,7 @@ pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<
     Ok((b"".as_bytes().into(), entries))
 }
 
+/// Parse an indirect object that contains a xref stream.
 pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefEntry>> {
     let (remainder, obj) = object::indirect_object(input)?;
 
@@ -234,11 +254,13 @@ pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefEntry>> {
     Ok((remainder, stream))
 }
 
+/// Parse either a xref stream or xref table.
 #[tracable_parser]
 pub fn xref(input: Span) -> CbParseResult<Xref> {
     branch::alt((combinator::into(xref_section), combinator::into(xref_stream)))(input)
 }
 
+/// Parse the End-Of-File marker and removes it from the end of the input.
 #[tracable_parser]
 pub fn eof_marker_tail(input: Span) -> CbParseResult<()> {
     // trailing bytes that follow the EOF marker are not possible since the limit we
