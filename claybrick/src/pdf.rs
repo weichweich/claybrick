@@ -350,6 +350,13 @@ pub struct Unsupported {
     pub w2: usize,
 }
 
+/// Denotes a free object reference in a xref stream.
+pub const XREF_FREE: usize = 0;
+/// Denotes a used object reference in a xref stream.
+pub const XREF_USED: usize = 1;
+/// Denotes a used and compressed object reference in a xref stream.
+pub const XREF_COMPRESSED: usize = 2;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum XrefEntry {
     Free(FreeObject),
@@ -365,9 +372,9 @@ impl XrefEntry {
     pub fn type_num(&self) -> usize {
         // TODO: use constantants
         match self {
-            XrefEntry::Free(_) => 0,
-            XrefEntry::Used(_) => 1,
-            XrefEntry::UsedCompressed(_) => 2,
+            XrefEntry::Free(_) => XREF_FREE,
+            XrefEntry::Used(_) => XREF_USED,
+            XrefEntry::UsedCompressed(_) => XREF_COMPRESSED,
             XrefEntry::Unsupported(Unsupported { type_num, .. }) => *type_num,
         }
     }

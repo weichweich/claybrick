@@ -3,12 +3,13 @@
 use nom::{branch, bytes, character, combinator, error::ParseError, multi, sequence, AsBytes, IResult};
 use nom_tracable::tracable_parser;
 
-use crate::pdf::{FreeObject, Unsupported, UsedObject, Xref, XrefEntry};
-
-use super::{
-    backward_search,
-    error::{CbParseError, CbParseErrorKind},
-    object, CbParseResult, Span,
+use crate::{
+    parse::{
+        backward_search,
+        error::{CbParseError, CbParseErrorKind},
+        object, CbParseResult, Span,
+    },
+    pdf::{FreeObject, Unsupported, UsedObject, Xref, XrefEntry, XREF_FREE, XREF_USED, XREF_COMPRESSED},
 };
 
 const EOF_MARKER: &[u8] = b"%%EOF";
@@ -140,24 +141,23 @@ pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<
     while remainder.len() >= entry_len {
         let (r, entry) = entry_parser(remainder)?;
 
-        // TODO: replace magic type number with constants
         entries.push(match entry {
-            // type 1 entry (free object)
-            (0, next_free, gen) => XrefEntry::Free(FreeObject {
+            // type 0 entry (free object)
+            (XREF_FREE, next_free, gen) => XrefEntry::Free(FreeObject {
                 number: index,
                 generation: gen,
                 next_free,
             }),
 
-            // type 2 entry (object position - byte offset)
-            (1, byte_offset, gen) => XrefEntry::Used(UsedObject {
+            // type 1 entry (object position - byte offset)
+            (XREF_USED, byte_offset, gen) => XrefEntry::Used(UsedObject {
                 number: index,
                 byte_offset,
                 generation: gen,
             }),
 
-            // type 3 entry (object position - compressed)
-            (2, next_free, gen) => XrefEntry::Free(FreeObject {
+            // type 2 entry (object position - compressed)
+            (XREF_COMPRESSED, next_free, gen) => XrefEntry::Free(FreeObject {
                 number: index,
                 generation: gen,
                 next_free,
@@ -175,7 +175,7 @@ pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<
         index += 1;
         remainder = r;
     }
-    Ok((b"".as_bytes().into(), entries))
+    Ok((remainder, entries))
 }
 
 /// Parse an indirect object that contains a xref stream.
