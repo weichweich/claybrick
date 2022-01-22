@@ -1,9 +1,17 @@
-use crate::pdf::{object::Name, Dictionary, Object, RawPdf};
+use crate::pdf::{
+    document::{pages::Pages, require_type},
+    object::Name,
+    Dictionary, Object, RawPdf,
+};
+
+use super::pages::PagesError;
 
 const K_VERSION: &[u8] = b"Version";
 const K_PAGES: &[u8] = b"Pages";
 const K_PAGES_LABEL: &[u8] = b"PagesLabel";
 const K_NAME: &[u8] = b"Name";
+
+const T_CATALOG: &[u8] = b"Catalog";
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CatalogError {
@@ -57,6 +65,8 @@ impl<'a> std::fmt::Debug for Catalog<'a> {
 
 impl<'a> Catalog<'a> {
     pub(crate) fn new_with(raw_pdf: &'a RawPdf, dict: &'a Dictionary) -> Result<Self, CatalogError> {
+        let _ = require_type(dict, T_CATALOG);
+
         Ok(Self {
             raw_pdf,
             version: dict.get(K_VERSION).and_then(Object::name),
@@ -77,7 +87,7 @@ impl<'a> Catalog<'a> {
         })
     }
 
-    // pub fn pages(&self) -> Pages {
-
-    // }
+    pub fn pages(&self) -> Result<Pages, PagesError> {
+        Pages::new_with(self.raw_pdf, self.pages)
+    }
 }
