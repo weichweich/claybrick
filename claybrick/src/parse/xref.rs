@@ -286,7 +286,7 @@ pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefEntry>> {
         })?,
     ];
 
-    let (empty, stream) = xref_stream_data(w, (&data[..]).into()).map_err(|err| {
+    let (_empty, stream) = xref_stream_data(w, (&data[..]).into()).map_err(|err| {
         log::error!("Error while parsing xref stream content: {:?}", err);
         nom::Err::Error(CbParseError::new(
             input,

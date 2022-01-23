@@ -11,6 +11,7 @@ pub enum CbParseErrorKind {
     // TODO: More detailed errors
     XrefInvalid(XrefError),
     StreamError(FilterError),
+    InvalidName,
     Nom(ErrorKind),
 }
 

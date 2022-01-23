@@ -1,10 +1,10 @@
 use fnv::FnvHashMap;
 use std::{collections::HashMap, ops::Deref};
 
-pub use self::xref::Xref;
 pub use self::{
     document::{Catalog, CatalogError},
     object::{Array, CbString, IndirectObject, Name, Object, Reference, Stream},
+    xref::Xref,
 };
 
 pub mod document;

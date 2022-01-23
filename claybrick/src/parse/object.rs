@@ -12,7 +12,10 @@ use crate::{
     pdf::{Array, Dictionary, IndirectObject, Name, Object, Reference, Stream},
 };
 
-use super::{error::CbParseError, CbParseResult};
+use super::{
+    error::{CbParseError, CbParseErrorKind},
+    CbParseResult,
+};
 
 const TRUE_OBJECT: &str = "true";
 const FALSE_OBJECT: &str = "false";
@@ -76,19 +79,20 @@ fn consume_string_content(input: Span) -> CbParseResult<()> {
     Ok((remainder, ()))
 }
 
-fn hex_char_to_nibble(c: u8) -> u8 {
+fn hex_char_to_nibble(c: u8) -> Option<u8> {
     match c {
-        b'a'..=b'f' => c - b'a' + 10,
-        b'A'..=b'F' => c - b'A' + 10,
-        b'0'..=b'9' => c - b'0',
-        _ => unreachable!(),
+        b'a'..=b'f' => Some(c - b'a' + 10),
+        b'A'..=b'F' => Some(c - b'A' + 10),
+        b'0'..=b'9' => Some(c - b'0'),
+        _ => None,
     }
 }
 
-fn unchecked_hex_decode(input: &[u8]) -> Vec<u8> {
+/// Expect that all input chars are in the range of a..=f, A..=F, 0..=9
+fn hex_decode(input: &[u8]) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(input.len() / 2 + input.len() % 2);
     for s in input.chunks_exact(2) {
-        out.push((hex_char_to_nibble(s[0]) << 4) + hex_char_to_nibble(s[1]));
+        out.push((hex_char_to_nibble(s[0])? << 4) + hex_char_to_nibble(s[1])?);
     }
 
     // if there is a remainder the last nibble is zero
@@ -96,7 +100,7 @@ fn unchecked_hex_decode(input: &[u8]) -> Vec<u8> {
         out.push(r << 4);
     }
 
-    out
+    Some(out)
 }
 
 #[tracable_parser]
@@ -107,7 +111,8 @@ pub(crate) fn hex_string_object(input: Span) -> CbParseResult<Object> {
         character::complete::char('>'),
     )(input)?;
 
-    let bytes = unchecked_hex_decode(content.fragment());
+    let bytes =
+        hex_decode(content.fragment()).expect("We checked the content and made sure it only contains hex chars.");
 
     let (remainder, _) = character::complete::multispace0(remainder)?;
 
@@ -166,9 +171,28 @@ pub(crate) fn name_object(input: Span) -> CbParseResult<Name> {
     let (remainder, name) = bytes::complete::take_while(is_regular)(remainder)?;
     let (remainder, _) = require_termination(remainder)?;
 
-    // TODO: parse name and replace all #XX with char
+    let mut out = Vec::<u8>::with_capacity(name.len());
+    let mut i = 0;
+    while i < name.len() {
+        match name[i] {
+            b'#' => {
+                let hex = name
+                    .get(i + 1..=i + 2)
+                    .ok_or_else(|| nom::Err::Error(CbParseError::new(input, CbParseErrorKind::InvalidName)))?;
+                let nibbles = hex_char_to_nibble(hex[0])
+                    .zip(hex_char_to_nibble(hex[1]))
+                    .ok_or_else(|| nom::Err::Error(CbParseError::new(input, CbParseErrorKind::InvalidName)))?;
+                out.push((nibbles.0 << 4) + nibbles.1);
+                i += 3;
+            }
+            other => {
+                out.push(other);
+                i += 1;
+            }
+        }
+    }
 
-    Ok((remainder, name.to_vec().into()))
+    Ok((remainder, out.into()))
 }
 
 #[tracable_parser]
@@ -210,6 +234,7 @@ pub(crate) fn array_object(input: Span) -> CbParseResult<Array> {
     Ok((remainder, array))
 }
 
+/// Get the stream content using the provided length.
 fn stream_by_length(length: usize, input: Span) -> CbParseResult<Vec<u8>> {
     let (remainder, data) = combinator::map(take(length), |b: Span| b.to_vec())(input)?;
     let remainder = character::complete::line_ending::<_, CbParseError<Span>>(remainder)
@@ -221,8 +246,12 @@ fn stream_by_length(length: usize, input: Span) -> CbParseResult<Vec<u8>> {
     Ok((remainder, data))
 }
 
+/// Get the stream content by searching for the `endstream` keyword. This is a
+/// fallback incase the stream length was invalid.
 #[tracable_parser]
 fn stream_by_keyword(input: Span) -> CbParseResult<Vec<u8>> {
+    log::warn!("Using fallback stream content parser.");
+
     let (remainder, data) =
         combinator::map(bytes::complete::take_until(&b"endstream"[..]), |b: Span| b.to_vec())(input)?;
     let (remainder, _) = bytes::complete::tag(b"endstream")(remainder)?;
@@ -429,17 +458,17 @@ mod tests {
 
     #[test]
     fn test_hex_to_nibble() {
-        assert_eq!(hex_char_to_nibble(b'f'), 15);
-        assert_eq!(hex_char_to_nibble(b'F'), 15);
-        assert_eq!(hex_char_to_nibble(b'0'), 0);
-        assert_eq!(hex_char_to_nibble(b'5'), 5);
+        assert_eq!(hex_char_to_nibble(b'f'), Some(15));
+        assert_eq!(hex_char_to_nibble(b'F'), Some(15));
+        assert_eq!(hex_char_to_nibble(b'0'), Some(0));
+        assert_eq!(hex_char_to_nibble(b'5'), Some(5));
     }
 
     #[test]
-    pub fn test_unchecked_hex_decode() {
+    pub fn test_hex_decode() {
         assert_eq!(
-            unchecked_hex_decode(b"FFFFFFFFFFFF".as_bytes()),
-            b"\xFF\xFF\xFF\xFF\xFF\xFF".to_vec()
+            hex_decode(b"FFFFFFFFFFFF".as_bytes()),
+            Some(b"\xFF\xFF\xFF\xFF\xFF\xFF".to_vec())
         )
     }
 
@@ -458,17 +487,39 @@ mod tests {
 
     #[test]
     pub fn test_name_object() {
-        assert!(object(b"/Name1".as_bytes().into()).is_ok());
-        assert!(object(b"/ASomewhatLongerName".as_bytes().into()).is_ok());
-        assert!(object(b"/A;Name_With-Various***Characters?".as_bytes().into()).is_ok());
-        assert!(object(b"/1.2".as_bytes().into()).is_ok());
-        assert!(object(b"/$$".as_bytes().into()).is_ok());
-        assert!(object(b"/@pattern".as_bytes().into()).is_ok());
-        assert!(object(b"/.notdef".as_bytes().into()).is_ok());
-        assert!(object(b"/lime#20Green".as_bytes().into()).is_ok());
-        assert!(object(b"/paired#28#29parentheses".as_bytes().into()).is_ok());
-        assert!(object(b"/The_Key_of_F#23_Minor".as_bytes().into()).is_ok());
-        assert!(object(b"/A#42".as_bytes().into()).is_ok());
+        let pairs = vec![
+            (b"/lime#20Green".as_bytes(), b"lime Green".as_bytes()),
+            (
+                b"/paired#28#29parentheses".as_bytes(),
+                b"paired()parentheses".as_bytes(),
+            ),
+            (b"/The_Key_of_F#23_Minor".as_bytes(), b"The_Key_of_F#_Minor".as_bytes()),
+            (b"/A#42".as_bytes(), b"AB".as_bytes()),
+            (b"/Name1".as_bytes(), b"Name1".as_bytes()),
+            (b"/ASomewhatLongerName".as_bytes(), b"ASomewhatLongerName".as_bytes()),
+            (
+                b"/A;Name_With-Various***Characters?".as_bytes(),
+                b"A;Name_With-Various***Characters?".as_bytes(),
+            ),
+            (b"/1.2".as_bytes(), b"1.2".as_bytes()),
+            (b"/$$".as_bytes(), b"$$".as_bytes()),
+            (b"/@pattern".as_bytes(), b"@pattern".as_bytes()),
+            (b"/.notdef".as_bytes(), b".notdef".as_bytes()),
+        ];
+
+        for (input, expected) in pairs {
+            let out = name_object(input.into());
+            assert!(out.is_ok(), "Error while parsing `{}`", String::from_utf8_lossy(input));
+            let out = out.unwrap().1;
+            assert_eq!(
+                &out[..],
+                expected,
+                "Failed to decode name `{}`. Expected `{}`, got `{}`.",
+                String::from_utf8_lossy(input),
+                String::from_utf8_lossy(expected),
+                String::from_utf8_lossy(&out)
+            );
+        }
     }
 
     #[test]
