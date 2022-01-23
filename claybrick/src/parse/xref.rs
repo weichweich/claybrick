@@ -9,11 +9,24 @@ use crate::{
         error::{CbParseError, CbParseErrorKind},
         object, CbParseResult, Span,
     },
-    pdf::xref::{FreeObject, Unsupported, UsedObject, Xref, XrefEntry, XREF_FREE, XREF_USED, XREF_COMPRESSED},
+    pdf::xref::{FreeObject, Unsupported, UsedObject, Xref, XrefEntry, XREF_COMPRESSED, XREF_FREE, XREF_USED},
 };
 
 const EOF_MARKER: &[u8] = b"%%EOF";
 const STARTXREF: &[u8] = b"startxref";
+
+/// Errors that occur while parsing the xref section.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum XrefError {
+    /// The stream object wasn't the correct type.
+    StreamObject,
+
+    /// The W entry in the stream object dictionary was invalid.
+    WEntry,
+
+    /// There was an error in the content of the xref stream.
+    StreamContent,
+}
 
 /// Find and returns the position of the xref table/stream by searching for
 /// `startxref <number>` from the end of the input and parsing the number that
@@ -46,9 +59,11 @@ fn xref_entries(input: Span) -> CbParseResult<Vec<XrefEntry>> {
 
     // FIXME: is it fine to just take a user defined value and request memory like
     // that? Might be a way to crash software?
-
-    // FIXME: Iterate on convertion error handling (is 5 a good default?)
-    let mut entries = Vec::<XrefEntry>::with_capacity(obj_count.try_into().unwrap_or(5));
+    let mut entries = if let Ok(count) = obj_count.try_into() {
+        Vec::<XrefEntry>::with_capacity(count)
+    } else {
+        Vec::<XrefEntry>::new()
+    };
 
     let mut remainder = remainder;
     for i in 0..obj_count {
@@ -85,6 +100,7 @@ fn xref_entries(input: Span) -> CbParseResult<Vec<XrefEntry>> {
         entries.push(entry);
         remainder = inner_rmndr;
     }
+    log::debug!("Expected {} xef entries, got {}", obj_count, entries.len());
 
     Ok((remainder, entries))
 }
@@ -130,7 +146,7 @@ fn xref_stream_entry<'a, E: ParseError<Span<'a>>>(
 }
 
 /// Parses the xref-stream data.
-/// 
+///
 /// `w` - the length of the three numbers in each stream entry.
 pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<XrefEntry>> {
     let entry_len: usize = w.iter().sum();
@@ -187,13 +203,19 @@ pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefEntry>> {
         .indirect()
         .ok_or_else(|| {
             log::error!("startxref didn't point to an indirect object");
-            nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid))
+            nom::Err::Error(CbParseError::new(
+                input,
+                CbParseErrorKind::XrefInvalid(XrefError::StreamObject),
+            ))
         })?
         .object
         .stream()
         .ok_or_else(|| {
             log::error!("indirect object didn't contain a stream");
-            nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid))
+            nom::Err::Error(CbParseError::new(
+                input,
+                CbParseErrorKind::XrefInvalid(XrefError::StreamObject),
+            ))
         })?;
 
     // get the data that is contained in the stream
@@ -209,45 +231,68 @@ pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefEntry>> {
         .get(&b"W"[..])
         .ok_or_else(|| {
             log::error!("Missing W entry in xref stream dictionary");
-            nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid))
+            nom::Err::Error(CbParseError::new(
+                input,
+                CbParseErrorKind::XrefInvalid(XrefError::WEntry),
+            ))
         })?
         .array()
         .ok_or_else(|| {
             log::error!("W entry didn't contain an array object");
-            nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid))
+            nom::Err::Error(CbParseError::new(
+                input,
+                CbParseErrorKind::XrefInvalid(XrefError::WEntry),
+            ))
         })?
         .iter()
         .map(|o| o.integer())
         .collect::<Option<Vec<i32>>>()
         .ok_or_else(|| {
             log::error!("Not all entries where integer objects");
-            nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid))
+            nom::Err::Error(CbParseError::new(
+                input,
+                CbParseErrorKind::XrefInvalid(XrefError::WEntry),
+            ))
         })?
         .try_into()
         .map_err(|_| {
             log::error!("W didn't contain exactly 3 entries.");
-            nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid))
+            nom::Err::Error(CbParseError::new(
+                input,
+                CbParseErrorKind::XrefInvalid(XrefError::WEntry),
+            ))
         })?;
     let w = [
         usize::try_from(w[0]).map_err(|e| {
             log::error!("W[0] can't be converted to usize ({})", e);
-            nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid))
+            nom::Err::Error(CbParseError::new(
+                input,
+                CbParseErrorKind::XrefInvalid(XrefError::WEntry),
+            ))
         })?,
         usize::try_from(w[1]).map_err(|e| {
             log::error!("W[1] can't be converted to usize ({})", e);
-            nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid))
+            nom::Err::Error(CbParseError::new(
+                input,
+                CbParseErrorKind::XrefInvalid(XrefError::WEntry),
+            ))
         })?,
         usize::try_from(w[2]).map_err(|e| {
             log::error!("W[2] can't be converted to usize ({})", e);
-            nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid))
+            nom::Err::Error(CbParseError::new(
+                input,
+                CbParseErrorKind::XrefInvalid(XrefError::WEntry),
+            ))
         })?,
     ];
 
     let (empty, stream) = xref_stream_data(w, (&data[..]).into()).map_err(|err| {
         log::error!("Error while parsing xref stream content: {:?}", err);
-        nom::Err::Error(CbParseError::new(input, CbParseErrorKind::XrefInvalid))
+        nom::Err::Error(CbParseError::new(
+            input,
+            CbParseErrorKind::XrefInvalid(XrefError::StreamContent),
+        ))
     })?;
-    debug_assert!(empty.len() == 0);
 
     log::debug!("xref stream data parsed");
 

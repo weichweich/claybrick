@@ -1,5 +1,6 @@
 use nom::error::{ErrorKind, ParseError};
 
+use super::xref::XrefError;
 use crate::{parse::trailer::TrailerError, pdf::object::stream::filter::FilterError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8,7 +9,7 @@ pub enum CbParseErrorKind {
     StartxrefInvalid,
     BackwardSearchNotFound,
     // TODO: More detailed errors
-    XrefInvalid,
+    XrefInvalid(XrefError),
     StreamError(FilterError),
     Nom(ErrorKind),
 }
