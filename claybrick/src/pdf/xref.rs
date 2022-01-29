@@ -94,7 +94,6 @@ pub enum XrefEntry {
 
 impl XrefEntry {
     pub fn type_num(&self) -> usize {
-        // TODO: use constantants
         match self {
             XrefEntry::Free(_) => XREF_FREE,
             XrefEntry::Used(_) => XREF_USED,

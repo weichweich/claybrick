@@ -29,16 +29,16 @@ impl RawPdf {
         let root = &self
             .sections
             .first()
-            .expect("We always assert at least one section.")
+            .expect("FIXME: We always assert at least one section.")
             .trailer
             .as_ref()
-            .expect("A trailer is required.")
+            .expect("FIXME: A trailer is required.")
             .root;
         let catalog = self
             .object(
                 root.index
                     .try_into()
-                    .expect("TODO: replace u32 in data model with usize"),
+                    .expect("FIXME: replace u32 in data model with usize"),
             )
             .unwrap()
             .indirect()

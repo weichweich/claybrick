@@ -42,27 +42,27 @@ pub(crate) fn object_stream(stream: &Stream) -> Result<Vec<(usize, Object)>, CbP
     dict.get(K_TYPE)
         .and_then(Object::name)
         .filter(|name| &name[..] == OBJECT_STREAM)
-        .expect("TODO: error for wrong type");
+        .expect("FIXME: error for wrong type");
     let length: usize = dict
         .get(K_LENGTH)
         .and_then(Object::integer)
-        .expect("TODO: error for wrong length")
+        .expect("FIXME: error for wrong length")
         .try_into()
-        .expect("TODO: error for invalid length");
+        .expect("FIXME: error for invalid length");
     let obj_count: usize = dict
         .get(K_STREAM_OBJECT_COUNT)
         .and_then(Object::integer)
-        .expect("TODO: error for wrong count")
+        .expect("FIXME: error for wrong count")
         .try_into()
-        .expect("TODO: error for invalid count");
+        .expect("FIXME: error for invalid count");
     let first_offset: usize = dict
         .get(K_FIRST)
         .and_then(Object::integer)
-        .expect("TODO: error for wrong count")
+        .expect("FIXME: error for wrong count")
         .try_into()
-        .expect("TODO: error for invalid count");
+        .expect("FIXME: error for invalid count");
 
-    let data = stream.filtered_data().expect("TODO: error handling");
+    let data = stream.filtered_data().expect("FIXME: error handling");
 
     let (_, objs) = parse_content(length, obj_count, first_offset, (&data[..]).into()).expect("TODO: error handling");
     Ok(objs)

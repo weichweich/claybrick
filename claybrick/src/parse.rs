@@ -106,15 +106,15 @@ pub(crate) fn pdf_section(input: Span) -> CbParseResult<Vec<PdfSection>> {
 
         // TODO: read compressed objects
         for obj_xref in xref.compressed_objects() {
-            let obj = objects.get(&obj_xref.number).expect("TODO: missing stream object");
+            let obj = objects.get(&obj_xref.number).expect("FIXME: missing stream object");
             let stream = obj
                 .indirect()
-                .expect("TODO: handle invalid object")
+                .expect("FIXME: handle invalid object")
                 .object
                 .stream()
-                .expect("TODO: handle invalid object");
+                .expect("FIXME: handle invalid object");
 
-            for (number, obj) in object_stream(stream).expect("TODO: handle error") {
+            for (number, obj) in object_stream(stream).expect("FIXME: handle error") {
                 objects.insert(number, obj);
             }
         }
