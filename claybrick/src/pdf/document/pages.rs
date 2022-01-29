@@ -1,10 +1,6 @@
 use crate::pdf::{document::require_type, Array, Dictionary, IndirectObject, Object, RawPdf};
 
-const T_PAGES: &[u8] = b"Pages";
-
-const K_PARENT: &[u8] = b"Parent";
-const K_KIDS: &[u8] = b"Kids";
-const K_COUNT: &[u8] = b"Count";
+use super::{dict_types::PAGES, K_KIDS, K_COUNT};
 
 pub enum PagesError {
     InvalidParent,
@@ -25,7 +21,7 @@ pub struct Pages<'a> {
 
 impl<'a> Pages<'a> {
     pub(crate) fn new_with(raw_pdf: &'a RawPdf, dict: &'a Dictionary) -> Result<Self, PagesError> {
-        let _ = require_type(dict, T_PAGES);
+        let _ = require_type(dict, PAGES);
 
         let pages = Self {
             raw_pdf,

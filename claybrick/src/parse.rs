@@ -7,6 +7,7 @@ use crate::pdf::{PdfSection, RawPdf};
 use self::{
     error::{CbParseError, CbParseErrorKind},
     object::{indirect_object, object},
+    object_stream::object_stream,
     trailer::trailer_tail,
 };
 
@@ -14,6 +15,7 @@ pub use self::xref::{eof_marker_tail, startxref_tail, xref};
 
 pub mod error;
 mod object;
+mod object_stream;
 mod trailer;
 mod xref;
 
@@ -103,6 +105,19 @@ pub(crate) fn pdf_section(input: Span) -> CbParseResult<Vec<PdfSection>> {
         }
 
         // TODO: read compressed objects
+        for obj_xref in xref.compressed_objects() {
+            let obj = objects.get(&obj_xref.number).expect("TODO: missing stream object");
+            let stream = obj
+                .indirect()
+                .expect("TODO: handle invalid object")
+                .object
+                .stream()
+                .expect("TODO: handle invalid object");
+
+            for (number, obj) in object_stream(stream).expect("TODO: handle error") {
+                objects.insert(number, obj);
+            }
+        }
 
         // The filter ensures that each new section is before the current one, thus
         // preventing a loop.
