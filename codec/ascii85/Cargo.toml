@@ -1,7 +1,7 @@
 [package]
+edition = "2021"
 name = "aw-ascii85"
 version = "0.1.0"
-edition = "2021"
 
 [dependencies]
 
@@ -9,8 +9,8 @@ edition = "2021"
 criterion = "0.3"
 
 [[bench]]
-name = "benchmarks"
 harness = false
+name = "benchmarks"
 
 [lib]
 bench = false
