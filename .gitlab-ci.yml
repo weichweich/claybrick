@@ -2,19 +2,19 @@ stages:
 - test
 
 clippy:
-  image: rust:slim
+  image: rustlang/rust:nightly-slim
   stage: test
   timeout: 1 hours
   script:
-    - rustup component add clippy
+    - rustup component add clippy --toolchain nightly
     - cargo clippy --all-features --all-targets -- -D warnings
 
 fmt:
-  image: rust:slim
+  image: rustlang/rust:nightly-slim
   stage: test
   timeout: 1 hours
   script:
-    - rustup component add rustfmt
+    - rustup component add rustfmt --toolchain nightly
     - cargo +nightly fmt -- --check
 
 test:
