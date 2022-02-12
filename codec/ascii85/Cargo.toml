@@ -2,6 +2,7 @@
 edition = "2021"
 name = "aw-ascii85"
 version = "0.1.0"
+license = "MIT"
 
 [dependencies]
 
