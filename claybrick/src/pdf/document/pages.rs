@@ -1,6 +1,6 @@
 use crate::pdf::{document::require_type, Array, Dictionary, IndirectObject, Object, RawPdf};
 
-use super::{dict_types::PAGES, K_KIDS, K_COUNT};
+use super::{dict_types::PAGES, K_COUNT, K_KIDS};
 
 pub enum PagesError {
     InvalidParent,

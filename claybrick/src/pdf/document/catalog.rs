@@ -4,7 +4,7 @@ use crate::pdf::{
     Dictionary, Object, RawPdf,
 };
 
-use super::{pages::PagesError, dict_types::CATALOG, K_VERSION, K_PAGES, K_PAGES_LABEL, K_NAME};
+use super::{dict_types::CATALOG, pages::PagesError, K_NAME, K_PAGES, K_PAGES_LABEL, K_VERSION};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CatalogError {

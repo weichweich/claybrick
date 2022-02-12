@@ -26,7 +26,8 @@ fn parse_content(
         let (r, _) = character::complete::multispace0(r)?;
         remainder = r;
 
-        // parse object with number `obj_number` at position `first_offset + byte_offset`.
+        // parse object with number `obj_number` at position `first_offset +
+        // byte_offset`.
         let (obj_bytes, _) = bytes::complete::take(first_offset + byte_offset)(input)?;
         let (_, obj) = object(obj_bytes)?;
 
@@ -64,13 +65,13 @@ pub(crate) fn object_stream(stream: &Stream) -> Result<Vec<(usize, Object)>, CbP
 
     let data = stream.filtered_data().expect("FIXME: error handling");
 
-    let (_, objs) = parse_content(length, obj_count, first_offset, (&data[..]).into()).expect("TODO: error handling");
+    let (_, objs) = parse_content(length, obj_count, first_offset, data[..].into()).expect("TODO: error handling");
     Ok(objs)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::pdf::{Name, Bytes};
+    use crate::pdf::{Bytes, Name};
 
     use super::*;
 
@@ -82,7 +83,8 @@ mod tests {
                 (Name::new(K_STREAM_OBJECT_COUNT.into()), Object::Integer(0)),
                 (Name::new(K_FIRST.into()), Object::Integer(0)),
                 (Name::new(K_LENGTH.into()), Object::Integer(0)),
-            ].into(),
+            ]
+            .into(),
             data: b"".to_vec().into(),
         };
 
@@ -97,13 +99,15 @@ mod tests {
                 (Name::new(K_TYPE.into()), Object::from(Name::new(OBJECT_STREAM.into()))),
                 (Name::new(K_STREAM_OBJECT_COUNT.into()), Object::Integer(1)),
                 (Name::new(K_FIRST.into()), Object::Integer(6)),
-                (Name::new(K_LENGTH.into()), Object::Integer(data.len().try_into().unwrap())),
-            ].into(),
+                (
+                    Name::new(K_LENGTH.into()),
+                    Object::Integer(data.len().try_into().unwrap()),
+                ),
+            ]
+            .into(),
             data,
         };
 
-        assert_eq!(object_stream(&input_stream), Ok(vec![
-            (123, Object::Integer(999))
-        ]))
+        assert_eq!(object_stream(&input_stream), Ok(vec![(123, Object::Integer(999))]))
     }
 }
