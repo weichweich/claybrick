@@ -1,4 +1,4 @@
-use crate::pdf::{document::require_type, Array, Dictionary, IndirectObject, Object, RawPdf};
+use crate::pdf::{document::require_type, Array, Dictionary, Object, RawPdf};
 
 use super::{dict_types::PAGES, K_COUNT, K_KIDS};
 
@@ -11,8 +11,10 @@ pub enum PagesError {
 }
 
 pub struct Pages<'a> {
-    raw_pdf: &'a RawPdf,
-    parent: Option<&'a IndirectObject>,
+    // storing a backref to the whole raw pdf document might be helpful to resolve objects etc.
+    // raw_pdf: &'a RawPdf,
+    // pages have a backref to their parent. We might want to store that here.
+    // parent: Option<&'a IndirectObject>,
     /// PageTree or Page objects, indirect.
     kids: &'a Array,
     /// Number of leafs.
@@ -24,8 +26,7 @@ impl<'a> Pages<'a> {
         let _ = require_type(dict, PAGES);
 
         let pages = Self {
-            raw_pdf,
-            parent: None,
+            // raw_pdf,
             kids: match dict.get(K_KIDS).ok_or(PagesError::MissingKids)? {
                 Object::Array(a) => Ok(a),
                 Object::Reference(r) => raw_pdf

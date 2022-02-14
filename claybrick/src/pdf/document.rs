@@ -13,7 +13,8 @@ pub(crate) mod dict_types {
 }
 
 pub(crate) const K_TYPE: &[u8] = b"Type";
-pub(crate) const K_PARENT: &[u8] = b"Parent";
+// parent key, for parent objects. not yet needed
+// pub(crate) const K_PARENT: &[u8] = b"Parent";
 pub(crate) const K_KIDS: &[u8] = b"Kids";
 pub(crate) const K_COUNT: &[u8] = b"Count";
 pub(crate) const K_VERSION: &[u8] = b"Version";

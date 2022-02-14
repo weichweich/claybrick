@@ -342,12 +342,6 @@ pub(crate) fn object(input: Span) -> CbParseResult<Object> {
     ))(input)
 }
 
-#[tracable_parser]
-pub(crate) fn object0(input: Span) -> CbParseResult<Vec<Object>> {
-    let (remainder, _) = character::complete::multispace0(input)?;
-    multi::many0(object)(remainder)
-}
-
 #[cfg(test)]
 mod tests {
     use nom::AsBytes;
@@ -684,45 +678,8 @@ endstream"
     }
 
     #[test]
-    pub fn test_object0() {
-        let parsed_obj = object0(
-            b"     1 0 obj
-        << /Type /Catalog
-           /Pages 2 0 R
-        >>
-        endobj
-        2 0 obj
-        << /Kids [3 0 R]
-           /Type /Pages
-           /Count 1
-        >>
-        endobj
-        3 0 obj
-        << /Contents 4 0 R
-           /Type /Page
-           /Resources << /XObject << /Im0 5 0 R >> >>
-           /Parent 2 0 R
-           /MediaBox [0 0 180 240]
-        >>
-        endobj"
-                .as_bytes()
-                .into(),
-        )
-        .unwrap()
-        .1;
-        assert!(
-            matches!(
-                &parsed_obj[..],
-                [Object::Indirect(_), Object::Indirect(_), Object::Indirect(_),]
-            ),
-            "Unexpected parsing result: {:#?}",
-            parsed_obj
-        );
-    }
-
-    #[test]
     fn test_object_00() {
-        let parsed_obj = object0(
+        let parsed_obj = object(
             b"8784 0 obj <</Linearized 1/L 6962693/O 8787/E 131293/N 768/T 6954970/H [ 2799 5432]>>\rendobj"
                 .as_bytes()
                 .into(),
@@ -731,12 +688,12 @@ endstream"
         .1;
         assert!(
             matches!(
-                &parsed_obj[..],
-                [Object::Indirect(IndirectObject {
+                parsed_obj,
+                Object::Indirect(IndirectObject {
                     index: 8784,
                     generation: 0,
                     object: _
-                })]
+                })
             ),
             "Unexpected parsing result: {:#?}",
             parsed_obj
