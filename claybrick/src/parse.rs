@@ -206,6 +206,6 @@ mod tests {
         let info = TracableInfo::new().forward(true).backward(true);
         let input = LocatedSpan::new_extra(b"%\xbf\xbf\xbf\xbf\xbf\n".as_bytes(), info);
 
-        assert_eq!((true), binary_indicator(input).unwrap().1);
+        assert!(binary_indicator(input).unwrap().1);
     }
 }

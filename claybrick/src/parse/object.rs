@@ -564,12 +564,12 @@ mod tests {
     #[test]
     pub fn test_array_object() {
         assert_eq!(
-            object(b"[549 3.14 false (Ralph) /SomeName]".as_bytes().into())
+            object(b"[549 1.234 false (Ralph) /SomeName]".as_bytes().into())
                 .unwrap()
                 .1,
             Object::Array(Array::from(vec![
                 Object::Integer(549),
-                Object::Float(3.14),
+                Object::Float(1.234),
                 Object::Bool(false),
                 Object::String(b"Ralph".to_vec().into()),
                 Object::Name(b"SomeName".to_vec().into())
