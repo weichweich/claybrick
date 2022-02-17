@@ -17,8 +17,8 @@ use super::{
     CbParseResult,
 };
 
-const TRUE_OBJECT: &str = "true";
-const FALSE_OBJECT: &str = "false";
+pub(crate) const TRUE_OBJECT: &str = "true";
+pub(crate) const FALSE_OBJECT: &str = "false";
 
 fn is_delimiter(chr: u8) -> bool {
     matches!(chr, b'(' | b')' | b'<' | b'>' | b'[' | b']' | b'{' | b'}' | b'/' | b'%')

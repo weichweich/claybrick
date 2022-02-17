@@ -14,7 +14,7 @@ use self::{
 pub use self::xref::{eof_marker_tail, startxref_tail, xref};
 
 pub mod error;
-mod object;
+pub(crate) mod object;
 mod object_stream;
 mod trailer;
 mod xref;

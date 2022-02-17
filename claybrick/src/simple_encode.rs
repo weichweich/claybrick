@@ -1,4 +1,5 @@
 use crate::{
+    parse::object::{FALSE_OBJECT, TRUE_OBJECT},
     pdf::Object,
     writer::{Encoder, Writer},
 };
@@ -13,7 +14,8 @@ impl Encoder<Object> for SimpleEncode {
             Object::HexString(_) => todo!(),
             Object::Float(_) => todo!(),
             Object::Integer(_) => todo!(),
-            Object::Bool(_) => todo!(),
+            Object::Bool(true) => TRUE_OBJECT.len(),
+            Object::Bool(false) => FALSE_OBJECT.len(),
             Object::Name(_) => todo!(),
             Object::Array(_) => todo!(),
             Object::Dictionary(_) => todo!(),
@@ -30,7 +32,8 @@ impl Encoder<Object> for SimpleEncode {
             Object::HexString(_) => todo!(),
             Object::Float(_) => todo!(),
             Object::Integer(_) => todo!(),
-            Object::Bool(_) => todo!(),
+            Object::Bool(true) => writer.write(TRUE_OBJECT.as_bytes()),
+            Object::Bool(false) => writer.write(FALSE_OBJECT.as_bytes()),
             Object::Name(_) => todo!(),
             Object::Array(_) => todo!(),
             Object::Dictionary(_) => todo!(),
