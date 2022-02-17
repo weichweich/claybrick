@@ -9,6 +9,7 @@ use pdf::RawPdf;
 mod error;
 pub mod parse;
 mod pdf;
+pub mod simple_encode;
 pub mod writer;
 
 /// Read a PDF file and return the parsed `Pdf`.

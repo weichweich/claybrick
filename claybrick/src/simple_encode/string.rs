@@ -1,15 +1,18 @@
-use crate::pdf::CbString;
+use crate::{
+    pdf::CbString,
+    writer::{Encoder, Writer},
+};
 
-use super::{Encode, Writer};
+use super::SimpleEncode;
 
-impl Encode for CbString {
-    fn encoded_len(&self) -> usize {
-        let mut len = self.len();
+impl Encoder<CbString> for SimpleEncode {
+    fn encoded_len(str: &CbString) -> usize {
+        let mut len = str.len();
         let mut open_paranthesis = 0;
-        let mut remaining_closing_paranthesis = self.iter().filter(|&c| *c == b')').count();
+        let mut remaining_closing_paranthesis = str.iter().filter(|&c| *c == b')').count();
 
         // check for characters that we need to escape.
-        for char in self.iter() {
+        for char in str.iter() {
             match (char, open_paranthesis, remaining_closing_paranthesis) {
                 (b'(', _, 0) => {
                     len += 1;
@@ -34,19 +37,19 @@ impl Encode for CbString {
         len + 2
     }
 
-    fn write_to(&self, writer: &mut dyn Writer) {
+    fn write_to(str: &CbString, writer: &mut dyn Writer) {
         writer.write(&b"("[..]);
 
         let mut open_paranthesis: usize = 0;
-        let mut remaining_closing_paranthesis = self.iter().filter(|&c| *c == b')').count();
+        let mut remaining_closing_paranthesis = str.iter().filter(|&c| *c == b')').count();
 
         let mut last_written_index = 0;
         // check for characters that we need to escape.
-        for (index, char) in self.iter().enumerate() {
+        for (index, char) in str.iter().enumerate() {
             match (char, open_paranthesis, remaining_closing_paranthesis) {
                 (b'(', _, 0) => {
                     open_paranthesis += 1;
-                    writer.write(&self[last_written_index..index]);
+                    writer.write(&str[last_written_index..index]);
                     writer.write(&br"\"[..]);
                     last_written_index = index;
                 }
@@ -54,7 +57,7 @@ impl Encode for CbString {
                 // unbalanced closing paranthesis need to be escaped, they would otherwise determain the end of the
                 // string
                 (b')', 0, _) => {
-                    writer.write(&self[last_written_index..index]);
+                    writer.write(&str[last_written_index..index]);
                     writer.write(&br"\"[..]);
                     last_written_index = index;
                     remaining_closing_paranthesis = remaining_closing_paranthesis.saturating_sub(1);
@@ -67,30 +70,30 @@ impl Encode for CbString {
                 _ => {}
             }
         }
-        writer.write(&self[last_written_index..]);
+        writer.write(&str[last_written_index..]);
         writer.write(&b")"[..]);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{pdf::CbString, writer::Encode};
+    use crate::{pdf::CbString, simple_encode::SimpleEncode, writer::Encoder};
 
     #[test]
     fn test_simple() {
         let simple = CbString::from(b"abcdefg".to_vec());
-        assert_eq!(simple.len() + 2, simple.encoded_len());
+        assert_eq!(simple.len() + 2, SimpleEncode::encoded_len(&simple));
         let mut out = Vec::new();
-        simple.write_to(&mut out);
+        SimpleEncode::write_to(&simple, &mut out);
         assert_eq!(out, b"(abcdefg)".to_vec())
     }
 
     #[test]
     fn test_end_with_closing_paranthesis() {
         let simple = CbString::from(b"(abcdefg)".to_vec());
-        assert_eq!(simple.len() + 2, simple.encoded_len());
+        assert_eq!(simple.len() + 2, SimpleEncode::encoded_len(&simple));
         let mut out = Vec::new();
-        simple.write_to(&mut out);
+        SimpleEncode::write_to(&simple, &mut out);
         assert_eq!(out, b"((abcdefg))".to_vec())
     }
 
@@ -99,9 +102,9 @@ mod tests {
         let simple = CbString::from(b"abcdefg)".to_vec());
 
         // 2 for start and end. One for escaping.
-        assert_eq!(simple.len() + 3, simple.encoded_len());
+        assert_eq!(simple.len() + 3, SimpleEncode::encoded_len(&simple));
         let mut out = Vec::new();
-        simple.write_to(&mut out);
+        SimpleEncode::write_to(&simple, &mut out);
         assert_eq!(out, br"(abcdefg\))".to_vec())
     }
 
@@ -110,9 +113,9 @@ mod tests {
         let simple = CbString::from(b")))))))))".to_vec());
 
         // 2 for start and end. many for escaping.
-        assert_eq!(simple.len() * 2 + 2, simple.encoded_len());
+        assert_eq!(simple.len() * 2 + 2, SimpleEncode::encoded_len(&simple));
         let mut out = Vec::new();
-        simple.write_to(&mut out);
+        SimpleEncode::write_to(&simple, &mut out);
         assert_eq!(out, br"(\)\)\)\)\)\)\)\)\))".to_vec())
     }
 
@@ -121,9 +124,9 @@ mod tests {
         let simple = CbString::from(b"(((((((((".to_vec());
 
         // 2 for start and end. many for escaping.
-        assert_eq!(simple.len() * 2 + 2, simple.encoded_len());
+        assert_eq!(simple.len() * 2 + 2, SimpleEncode::encoded_len(&simple));
         let mut out = Vec::new();
-        simple.write_to(&mut out);
+        SimpleEncode::write_to(&simple, &mut out);
         assert_eq!(out, br"(\(\(\(\(\(\(\(\(\()".to_vec())
     }
 
@@ -132,9 +135,9 @@ mod tests {
         let simple = CbString::from(b"((((((()))))))".to_vec());
 
         // 2 for start and end. many for escaping.
-        assert_eq!(simple.len() + 2, simple.encoded_len());
+        assert_eq!(simple.len() + 2, SimpleEncode::encoded_len(&simple));
         let mut out = Vec::new();
-        simple.write_to(&mut out);
+        SimpleEncode::write_to(&simple, &mut out);
         assert_eq!(out, br"(((((((())))))))".to_vec())
     }
 
@@ -143,9 +146,9 @@ mod tests {
         let simple = CbString::from(b")))))(((((".to_vec());
 
         // 2 for start and end. many for escaping.
-        assert_eq!(simple.len() * 2 + 2, simple.encoded_len());
+        assert_eq!(simple.len() * 2 + 2, SimpleEncode::encoded_len(&simple));
         let mut out = Vec::new();
-        simple.write_to(&mut out);
+        SimpleEncode::write_to(&simple, &mut out);
         assert_eq!(out, br"(\)\)\)\)\)\(\(\(\(\()".to_vec())
     }
 }
