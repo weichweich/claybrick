@@ -19,12 +19,13 @@ use super::{
 
 pub(crate) const TRUE_OBJECT: &str = "true";
 pub(crate) const FALSE_OBJECT: &str = "false";
+pub(crate) const NULL_OBJECT: &str = "null";
 
-fn is_delimiter(chr: u8) -> bool {
+pub(crate) fn is_delimiter(chr: u8) -> bool {
     matches!(chr, b'(' | b')' | b'<' | b'>' | b'[' | b']' | b'{' | b'}' | b'/' | b'%')
 }
 
-fn is_regular(chr: u8) -> bool {
+pub(crate) fn is_regular(chr: u8) -> bool {
     !is_delimiter(chr) && !chr.is_ascii_whitespace()
 }
 
@@ -159,7 +160,7 @@ pub(crate) fn number_object(input: Span) -> CbParseResult<Object> {
 
 #[tracable_parser]
 pub(crate) fn null_object(input: Span) -> CbParseResult<Object> {
-    let (remainder, _) = bytes::complete::tag(b"null")(input)?;
+    let (remainder, _) = bytes::complete::tag(NULL_OBJECT)(input)?;
     let (remainder, _) = require_termination(remainder)?;
 
     Ok((remainder, Object::Null))
