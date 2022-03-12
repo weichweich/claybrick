@@ -4,6 +4,7 @@ use crate::{
     writer::{Encoder, Writer},
 };
 
+mod array;
 mod name;
 pub mod string;
 
@@ -18,7 +19,7 @@ impl Encoder<Object> for SimpleEncoder {
             Object::Bool(true) => TRUE_OBJECT.len(),
             Object::Bool(false) => FALSE_OBJECT.len(),
             Object::Name(n) => Self::encoded_len(n),
-            Object::Array(_) => todo!(),
+            Object::Array(a) => Self::encoded_len(a),
             Object::Dictionary(_) => todo!(),
             Object::Stream(_) => todo!(),
             Object::Null => NULL_OBJECT.len(),
@@ -40,7 +41,7 @@ impl Encoder<Object> for SimpleEncoder {
             Object::Bool(true) => writer.write(TRUE_OBJECT.as_bytes()),
             Object::Bool(false) => writer.write(FALSE_OBJECT.as_bytes()),
             Object::Name(n) => Self::write_to(n, writer),
-            Object::Array(_) => todo!(),
+            Object::Array(a) => Self::write_to(a, writer),
             Object::Dictionary(_) => todo!(),
             Object::Stream(_) => todo!(),
             Object::Null => writer.write(NULL_OBJECT.as_bytes()),

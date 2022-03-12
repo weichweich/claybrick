@@ -82,19 +82,23 @@ mod tests {
     #[test]
     fn test_simple() {
         let simple = CbString::from(b"abcdefg".to_vec());
-        assert_eq!(simple.len() + 2, SimpleEncoder::encoded_len(&simple));
+        let encoded_len = SimpleEncoder::encoded_len(&simple);
+        assert_eq!(encoded_len, simple.len() + 2);
         let mut out = Vec::new();
         SimpleEncoder::write_to(&simple, &mut out);
-        assert_eq!(out, b"(abcdefg)".to_vec())
+        assert_eq!(out, b"(abcdefg)".to_vec());
+        assert_eq!(encoded_len, out.len());
     }
 
     #[test]
     fn test_end_with_closing_paranthesis() {
         let simple = CbString::from(b"(abcdefg)".to_vec());
-        assert_eq!(simple.len() + 2, SimpleEncoder::encoded_len(&simple));
+        let encoded_len = SimpleEncoder::encoded_len(&simple);
+        assert_eq!(encoded_len, simple.len() + 2);
         let mut out = Vec::new();
         SimpleEncoder::write_to(&simple, &mut out);
-        assert_eq!(out, b"((abcdefg))".to_vec())
+        assert_eq!(out, b"((abcdefg))".to_vec());
+        assert_eq!(encoded_len, out.len());
     }
 
     #[test]
@@ -102,10 +106,12 @@ mod tests {
         let simple = CbString::from(b"abcdefg)".to_vec());
 
         // 2 for start and end. One for escaping.
-        assert_eq!(simple.len() + 3, SimpleEncoder::encoded_len(&simple));
+        let encoded_len = SimpleEncoder::encoded_len(&simple);
+        assert_eq!(encoded_len, simple.len() + 3);
         let mut out = Vec::new();
         SimpleEncoder::write_to(&simple, &mut out);
-        assert_eq!(out, br"(abcdefg\))".to_vec())
+        assert_eq!(out, br"(abcdefg\))".to_vec());
+        assert_eq!(encoded_len, out.len());
     }
 
     #[test]
@@ -113,10 +119,12 @@ mod tests {
         let simple = CbString::from(b")))))))))".to_vec());
 
         // 2 for start and end. many for escaping.
-        assert_eq!(simple.len() * 2 + 2, SimpleEncoder::encoded_len(&simple));
+        let encoded_len = SimpleEncoder::encoded_len(&simple);
+        assert_eq!(encoded_len, simple.len() * 2 + 2);
         let mut out = Vec::new();
         SimpleEncoder::write_to(&simple, &mut out);
-        assert_eq!(out, br"(\)\)\)\)\)\)\)\)\))".to_vec())
+        assert_eq!(out, br"(\)\)\)\)\)\)\)\)\))".to_vec());
+        assert_eq!(encoded_len, out.len());
     }
 
     #[test]
@@ -124,10 +132,12 @@ mod tests {
         let simple = CbString::from(b"(((((((((".to_vec());
 
         // 2 for start and end. many for escaping.
-        assert_eq!(simple.len() * 2 + 2, SimpleEncoder::encoded_len(&simple));
+        let encoded_len = SimpleEncoder::encoded_len(&simple);
+        assert_eq!(encoded_len, simple.len() * 2 + 2);
         let mut out = Vec::new();
         SimpleEncoder::write_to(&simple, &mut out);
-        assert_eq!(out, br"(\(\(\(\(\(\(\(\(\()".to_vec())
+        assert_eq!(out, br"(\(\(\(\(\(\(\(\(\()".to_vec());
+        assert_eq!(encoded_len, out.len());
     }
 
     #[test]
@@ -135,10 +145,12 @@ mod tests {
         let simple = CbString::from(b"((((((()))))))".to_vec());
 
         // 2 for start and end. many for escaping.
-        assert_eq!(simple.len() + 2, SimpleEncoder::encoded_len(&simple));
+        let encoded_len = SimpleEncoder::encoded_len(&simple);
+        assert_eq!(encoded_len, simple.len() + 2);
         let mut out = Vec::new();
         SimpleEncoder::write_to(&simple, &mut out);
-        assert_eq!(out, br"(((((((())))))))".to_vec())
+        assert_eq!(out, br"(((((((())))))))".to_vec());
+        assert_eq!(encoded_len, out.len());
     }
 
     #[test]
@@ -146,9 +158,11 @@ mod tests {
         let simple = CbString::from(b")))))(((((".to_vec());
 
         // 2 for start and end. many for escaping.
-        assert_eq!(simple.len() * 2 + 2, SimpleEncoder::encoded_len(&simple));
+        let encoded_len = SimpleEncoder::encoded_len(&simple);
+        assert_eq!(encoded_len, simple.len() * 2 + 2);
         let mut out = Vec::new();
         SimpleEncoder::write_to(&simple, &mut out);
-        assert_eq!(out, br"(\)\)\)\)\)\(\(\(\(\()".to_vec())
+        assert_eq!(out, br"(\)\)\)\)\)\(\(\(\(\()".to_vec());
+        assert_eq!(encoded_len, out.len());
     }
 }

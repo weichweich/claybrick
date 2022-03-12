@@ -29,7 +29,8 @@ mod tests {
     #[test]
     fn delimiter_in_the_middle() {
         let name = Name::from(b"Hello World!".to_vec());
-        assert_eq!(SimpleEncoder::encoded_len(&name), 15);
+        let encoded_len = SimpleEncoder::encoded_len(&name);
+        assert_eq!(encoded_len, 15);
         let mut out = Vec::new();
         SimpleEncoder::write_to(&name, &mut out);
         let expected = br"\Hello#20World!";
@@ -40,12 +41,14 @@ mod tests {
             String::from_utf8_lossy(expected),
             String::from_utf8_lossy(&out)
         );
+        assert_eq!(encoded_len, out.len());
     }
 
     #[test]
     fn delimiter_start() {
         let name = Name::from(b" HelloWorld!".to_vec());
-        assert_eq!(SimpleEncoder::encoded_len(&name), 15);
+        let encoded_len = SimpleEncoder::encoded_len(&name);
+        assert_eq!(encoded_len, 15);
         let mut out = Vec::new();
         SimpleEncoder::write_to(&name, &mut out);
         let expected = br"\#20HelloWorld!";
@@ -56,12 +59,14 @@ mod tests {
             String::from_utf8_lossy(expected),
             String::from_utf8_lossy(&out)
         );
+        assert_eq!(encoded_len, out.len());
     }
 
     #[test]
     fn delimiter_end() {
         let name = Name::from(b"HelloWorld! ".to_vec());
-        assert_eq!(SimpleEncoder::encoded_len(&name), 15);
+        let encoded_len = SimpleEncoder::encoded_len(&name);
+        assert_eq!(encoded_len, 15);
         let mut out = Vec::new();
         SimpleEncoder::write_to(&name, &mut out);
         let expected = br"\HelloWorld!#20";
@@ -72,12 +77,14 @@ mod tests {
             String::from_utf8_lossy(expected),
             String::from_utf8_lossy(&out)
         );
+        assert_eq!(encoded_len, out.len());
     }
 
     #[test]
     fn only_delimiters() {
         let name = Name::from(b"   ".to_vec());
-        assert_eq!(SimpleEncoder::encoded_len(&name), 10);
+        let encoded_len = SimpleEncoder::encoded_len(&name);
+        assert_eq!(encoded_len, 10);
         let mut out = Vec::new();
         SimpleEncoder::write_to(&name, &mut out);
         let expected = br"\#20#20#20";
@@ -88,12 +95,14 @@ mod tests {
             String::from_utf8_lossy(expected),
             String::from_utf8_lossy(&out)
         );
+        assert_eq!(encoded_len, out.len());
     }
 
     #[test]
     fn no_delimiters() {
         let name = Name::from(b"HelloWorld!".to_vec());
-        assert_eq!(SimpleEncoder::encoded_len(&name), 12);
+        let encoded_len = SimpleEncoder::encoded_len(&name);
+        assert_eq!(encoded_len, 12);
         let mut out = Vec::new();
         SimpleEncoder::write_to(&name, &mut out);
         let expected = br"\HelloWorld!";
@@ -104,5 +113,6 @@ mod tests {
             String::from_utf8_lossy(expected),
             String::from_utf8_lossy(&out)
         );
+        assert_eq!(encoded_len, out.len());
     }
 }
