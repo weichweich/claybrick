@@ -8,9 +8,7 @@ impl Encoder<Array> for SimpleEncoder {
         let mut size = 2;
 
         // bytes for all contained objects
-        for item in array.iter() {
-            size += Self::encoded_len(item);
-        }
+        size += array.iter().map(Self::encoded_len).sum::<usize>();
 
         // 1 delimiter between 2 objects
         size += array.len().saturating_sub(1);

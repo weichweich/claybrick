@@ -5,8 +5,9 @@ use crate::{
 };
 
 mod array;
+mod dictionary;
 mod name;
-pub mod string;
+mod string;
 
 struct SimpleEncoder;
 impl Encoder<Object> for SimpleEncoder {
