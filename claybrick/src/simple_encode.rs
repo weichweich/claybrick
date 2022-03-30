@@ -6,6 +6,7 @@ use crate::{
 
 mod array;
 mod dictionary;
+mod indirect;
 mod name;
 mod stream;
 mod string;
@@ -25,7 +26,7 @@ impl Encoder<Object> for SimpleEncoder {
             Object::Dictionary(d) => Self::encoded_len(d),
             Object::Stream(s) => Self::encoded_len(s),
             Object::Null => NULL_OBJECT.len(),
-            Object::Indirect(_) => todo!(),
+            Object::Indirect(i) => Self::encoded_len(i),
             Object::Reference(r) => r.index.to_string().len() + r.generation.to_string().len() + 3,
         }
     }
@@ -47,7 +48,7 @@ impl Encoder<Object> for SimpleEncoder {
             Object::Dictionary(d) => Self::write_to(d, writer),
             Object::Stream(s) => Self::write_to(s, writer),
             Object::Null => writer.write(NULL_OBJECT.as_bytes()),
-            Object::Indirect(_) => todo!(),
+            Object::Indirect(i) => Self::write_to(i, writer),
             Object::Reference(r) => {
                 writer.write(b"R");
                 writer.write(b" ");
