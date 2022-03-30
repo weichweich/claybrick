@@ -7,6 +7,7 @@ use crate::{
 mod array;
 mod dictionary;
 mod name;
+mod stream;
 mod string;
 
 struct SimpleEncoder;
@@ -21,11 +22,11 @@ impl Encoder<Object> for SimpleEncoder {
             Object::Bool(false) => FALSE_OBJECT.len(),
             Object::Name(n) => Self::encoded_len(n),
             Object::Array(a) => Self::encoded_len(a),
-            Object::Dictionary(_) => todo!(),
-            Object::Stream(_) => todo!(),
+            Object::Dictionary(d) => Self::encoded_len(d),
+            Object::Stream(s) => Self::encoded_len(s),
             Object::Null => NULL_OBJECT.len(),
             Object::Indirect(_) => todo!(),
-            Object::Reference(_) => todo!(),
+            Object::Reference(r) => r.index.to_string().len() + r.generation.to_string().len() + 3,
         }
     }
 
@@ -43,11 +44,17 @@ impl Encoder<Object> for SimpleEncoder {
             Object::Bool(false) => writer.write(FALSE_OBJECT.as_bytes()),
             Object::Name(n) => Self::write_to(n, writer),
             Object::Array(a) => Self::write_to(a, writer),
-            Object::Dictionary(_) => todo!(),
-            Object::Stream(_) => todo!(),
+            Object::Dictionary(d) => Self::write_to(d, writer),
+            Object::Stream(s) => Self::write_to(s, writer),
             Object::Null => writer.write(NULL_OBJECT.as_bytes()),
             Object::Indirect(_) => todo!(),
-            Object::Reference(_) => todo!(),
+            Object::Reference(r) => {
+                writer.write(b"R");
+                writer.write(b" ");
+                writer.write(r.generation.to_string().as_bytes());
+                writer.write(b" ");
+                writer.write(r.index.to_string().as_bytes());
+            }
         }
     }
 }
