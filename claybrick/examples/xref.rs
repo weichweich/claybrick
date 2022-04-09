@@ -4,7 +4,7 @@ use nom_tracable::{histogram, TracableInfo};
 use std::{fs::File, io::Read, path::PathBuf};
 use structopt::StructOpt;
 
-/// Read PDF files and print the internal representation.
+/// Print the Xref section of the PDF file.
 #[derive(StructOpt, Debug)]
 #[structopt(name = "claybrick-xref")]
 struct Opt {

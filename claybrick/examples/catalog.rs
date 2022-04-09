@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-/// Read PDF files and print the internal representation.
+/// Print the catalog object of the given PDF file.
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
 struct Opt {

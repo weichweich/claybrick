@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 /// Read PDF files and print the internal representation.
+/// 
+/// Trace all steps while parsing the file.
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
 struct Opt {
@@ -16,7 +18,7 @@ pub fn main() {
     let opt = Opt::from_args();
 
     let pdf = claybrick::read_file(opt.input.as_path());
-    let pdf = match pdf {
+    let _pdf = match pdf {
         Ok(pdf) => pdf,
         Err(e) => {
             log::error!("Error while parsing: {:?}", e);
@@ -25,6 +27,4 @@ pub fn main() {
     };
 
     histogram();
-
-    println!("{:#?}", pdf);
 }
