@@ -18,3 +18,11 @@ Short term goal is to  support rearranging pages in a PDF document.
 The `claybbrick` project is split into 3 parts pdf, parse, encode.
 The `pdf` module contains structs, enums and primitives that make it possible to represent a PDF file in memory.
 It should have no dependencies to the `parse` and `simple_encode` modules, since the parsing and encoding of a PDF should be something that can be replaces by a better implementation later.
+
+## Other PDF libraries
+
+There are a few Rust PDF libraries out there.
+
+* [pdf-rs/pdf](https://github.com/pdf-rs/pdf)
+* [lopdf](https://github.com/J-F-Liu/lopdf)
+* [murtyjones/purdy](https://github.com/murtyjones/purdy)
