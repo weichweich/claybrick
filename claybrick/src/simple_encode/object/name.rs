@@ -1,6 +1,6 @@
 use crate::{parse::object::is_regular, pdf::Name, writer::Encoder};
 
-use super::SimpleEncoder;
+use crate::simple_encode::SimpleEncoder;
 
 impl Encoder<Name> for SimpleEncoder {
     fn encoded_len(n: &Name) -> usize {

@@ -1,6 +1,6 @@
 use crate::{pdf::Stream, writer::Encoder};
 
-use super::SimpleEncoder;
+use crate::simple_encode::SimpleEncoder;
 
 const START_STREAM: &[u8] = b"stream";
 const END_STREAM: &[u8] = b"endstream";

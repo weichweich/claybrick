@@ -1,9 +1,8 @@
 use crate::{
     pdf::CbString,
+    simple_encode::SimpleEncoder,
     writer::{Encoder, Writer},
 };
-
-use super::SimpleEncoder;
 
 impl Encoder<CbString> for SimpleEncoder {
     fn encoded_len(str: &CbString) -> usize {

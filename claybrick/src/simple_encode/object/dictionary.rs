@@ -1,6 +1,6 @@
 use crate::{pdf::Dictionary, writer::Encoder};
 
-use super::SimpleEncoder;
+use crate::simple_encode::SimpleEncoder;
 
 impl Encoder<Dictionary> for SimpleEncoder {
     fn encoded_len(o: &Dictionary) -> usize {

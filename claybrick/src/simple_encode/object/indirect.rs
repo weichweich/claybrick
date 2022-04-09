@@ -1,6 +1,6 @@
 use crate::{pdf::IndirectObject, writer::Encoder};
 
-use super::SimpleEncoder;
+use crate::simple_encode::SimpleEncoder;
 
 impl Encoder<IndirectObject> for SimpleEncoder {
     fn encoded_len(o: &IndirectObject) -> usize {

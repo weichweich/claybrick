@@ -1,6 +1,6 @@
 use crate::{pdf::Array, writer::Encoder};
 
-use super::SimpleEncoder;
+use crate::simple_encode::SimpleEncoder;
 
 impl Encoder<Array> for SimpleEncoder {
     fn encoded_len(array: &Array) -> usize {
