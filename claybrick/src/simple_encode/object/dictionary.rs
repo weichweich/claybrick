@@ -3,21 +3,6 @@ use crate::{pdf::Dictionary, writer::Encoder};
 use crate::simple_encode::SimpleEncoder;
 
 impl Encoder<Dictionary> for SimpleEncoder {
-    fn encoded_len(o: &Dictionary) -> usize {
-        // 2 bytes for start and end each.
-        let mut size = 4;
-        size += o
-            .iter()
-            .map(|(n, o)| Self::encoded_len(n) + Self::encoded_len(o))
-            .sum::<usize>();
-
-        // For N entries we need N delimiters between key and value. We also need one
-        // delimiter for each pair (N - 1). This leads to 2 * N - 1.
-        size += (o.len() * 2).saturating_sub(1);
-
-        size
-    }
-
     fn write_to(o: &Dictionary, writer: &mut dyn crate::writer::Writer) {
         writer.write(b"<<");
         let mut is_first = true;

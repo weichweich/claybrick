@@ -24,7 +24,7 @@ impl RawPdf {
     }
 
     pub fn catalog(&self) -> Result<Catalog, CatalogError> {
-        // TODO: enforce at-least-section assertion.
+        // TODO: enforce at-least-one-section assertion.
         // TODO: enforce required-trailer assertion.
         let root = &self
             .sections

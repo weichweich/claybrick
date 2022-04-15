@@ -14,24 +14,6 @@ pub(crate) mod stream;
 pub(crate) mod string;
 
 impl Encoder<Object> for SimpleEncoder {
-    fn encoded_len(obj: &Object) -> usize {
-        match obj {
-            Object::String(str) => Self::encoded_len(str),
-            Object::HexString(bytes) => 2 + bytes.len() * 2,
-            Object::Float(f) => f.to_string().len(),
-            Object::Integer(i) => i.to_string().len(),
-            Object::Bool(true) => TRUE_OBJECT.len(),
-            Object::Bool(false) => FALSE_OBJECT.len(),
-            Object::Name(n) => Self::encoded_len(n),
-            Object::Array(a) => Self::encoded_len(a),
-            Object::Dictionary(d) => Self::encoded_len(d),
-            Object::Stream(s) => Self::encoded_len(s),
-            Object::Null => NULL_OBJECT.len(),
-            Object::Indirect(i) => Self::encoded_len(i),
-            Object::Reference(r) => r.index.to_string().len() + r.generation.to_string().len() + 3,
-        }
-    }
-
     fn write_to(obj: &Object, writer: &mut dyn Writer) {
         match obj {
             Object::String(str) => Self::write_to(str, writer),

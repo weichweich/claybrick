@@ -5,37 +5,6 @@ use crate::{
 };
 
 impl Encoder<CbString> for SimpleEncoder {
-    fn encoded_len(str: &CbString) -> usize {
-        let mut len = str.len();
-        let mut open_paranthesis = 0;
-        let mut remaining_closing_paranthesis = str.iter().filter(|&c| *c == b')').count();
-
-        // check for characters that we need to escape.
-        for char in str.iter() {
-            match (char, open_paranthesis, remaining_closing_paranthesis) {
-                (b'(', _, 0) => {
-                    len += 1;
-                    open_paranthesis += 1;
-                }
-                (b'(', ..) => open_paranthesis += 1,
-                // unbalanced closing paranthesis need to be escaped, they would otherwise determain the end of the
-                // string
-                (b')', 0, _) => {
-                    len += 1;
-                    remaining_closing_paranthesis -= 1;
-                }
-                (b')', ..) => {
-                    open_paranthesis -= 1;
-                    remaining_closing_paranthesis -= 1;
-                }
-                _ => {}
-            }
-        }
-
-        // we need two additional bytes for the opening and closing paranthesis
-        len + 2
-    }
-
     fn write_to(str: &CbString, writer: &mut dyn Writer) {
         writer.write(&b"("[..]);
 

@@ -3,19 +3,6 @@ use crate::{pdf::Array, writer::Encoder};
 use crate::simple_encode::SimpleEncoder;
 
 impl Encoder<Array> for SimpleEncoder {
-    fn encoded_len(array: &Array) -> usize {
-        // 1 Byte each for opening and closing bracket
-        let mut size = 2;
-
-        // bytes for all contained objects
-        size += array.iter().map(Self::encoded_len).sum::<usize>();
-
-        // 1 delimiter between 2 objects
-        size += array.len().saturating_sub(1);
-
-        size
-    }
-
     fn write_to(array: &Array, writer: &mut dyn crate::writer::Writer) {
         writer.write(b"[");
         for (i, item) in array.iter().enumerate() {

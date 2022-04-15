@@ -3,10 +3,6 @@ use crate::{parse::object::is_regular, pdf::Name, writer::Encoder};
 use crate::simple_encode::SimpleEncoder;
 
 impl Encoder<Name> for SimpleEncoder {
-    fn encoded_len(n: &Name) -> usize {
-        n.iter().map(|c| if is_regular(*c) { 1 } else { 3 }).sum::<usize>() + 1
-    }
-
     fn write_to(n: &Name, writer: &mut dyn crate::writer::Writer) {
         let mut last_write = 0;
         writer.write(br"\");
