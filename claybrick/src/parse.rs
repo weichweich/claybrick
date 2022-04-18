@@ -92,10 +92,10 @@ pub(crate) fn pdf_section(input: Span) -> CbParseResult<Vec<PdfSection>> {
         let (remainder_xref, _) = nom::bytes::complete::take(startxref)(input)?;
         let (_, xref) = xref::xref(remainder_xref)?;
 
-        let object_count = xref.objects().count();
+        let object_count = xref.used_objects().count();
         let mut objects = fnv::FnvHashMap::with_capacity_and_hasher(object_count, Default::default());
 
-        for obj_xref in xref.objects() {
+        for obj_xref in xref.used_objects() {
             // we always use input since the byte_offset is from the start of the file
             log::debug!("Parse object {:?}", obj_xref);
             let (obj_bytes, _) = bytes::complete::take(obj_xref.byte_offset)(input)?;

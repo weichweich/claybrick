@@ -70,12 +70,25 @@ pub struct PdfSection {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Trailer {
+    /// Highest object number used in the PDF document
     pub size: usize,
+
+    /// Byte offset to the previous PDF section
     pub previous: Option<usize>,
+
+    /// Reference to the root object
     pub root: Reference,
+
+    /// Object containing information for decryption.
     pub encrypt: Option<Object>,
+
+    /// Information for this document
     pub info: Option<Reference>,
+
+    /// File identifier
     pub id: Option<[Bytes; 2]>,
+
+    /// Start of the XRef table.
     pub x_ref_stm: Option<usize>,
 }
 

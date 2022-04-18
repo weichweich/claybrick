@@ -1,8 +1,15 @@
+/// References to objects inside a PDF section.
+///
+/// References in this table mark object indices either as used or unused.
+/// Unused object indices may be reused for new objects. Used objects are
+/// divided into two groups compressed and uncompressed objects. Uncompressed
+/// objects can be imidiately accessed at the given byte offset while compressed
+/// objects are contained inside a stream object.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Xref(Vec<XrefEntry>);
 
 impl Xref {
-    pub fn objects(&self) -> impl Iterator<Item = &UsedObject> {
+    pub fn used_objects(&self) -> impl Iterator<Item = &UsedObject> {
         self.0
             .iter()
             .filter_map(|entry| if let XrefEntry::Used(u) = entry { Some(u) } else { None })
@@ -91,7 +98,6 @@ pub enum XrefEntry {
     /// Unsupported xref entry. Point to null object.
     Unsupported(Unsupported),
 }
-
 impl XrefEntry {
     pub fn type_num(&self) -> usize {
         match self {
@@ -109,5 +115,29 @@ impl XrefEntry {
             XrefEntry::UsedCompressed(UsedCompressedObject { number, .. }) => *number,
             XrefEntry::Unsupported(Unsupported { number, .. }) => *number,
         }
+    }
+}
+
+impl From<Unsupported> for XrefEntry {
+    fn from(v: Unsupported) -> Self {
+        Self::Unsupported(v)
+    }
+}
+
+impl From<UsedCompressedObject> for XrefEntry {
+    fn from(v: UsedCompressedObject) -> Self {
+        Self::UsedCompressed(v)
+    }
+}
+
+impl From<UsedObject> for XrefEntry {
+    fn from(v: UsedObject) -> Self {
+        Self::Used(v)
+    }
+}
+
+impl From<FreeObject> for XrefEntry {
+    fn from(v: FreeObject) -> Self {
+        Self::Free(v)
     }
 }
