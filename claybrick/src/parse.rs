@@ -88,7 +88,8 @@ pub(crate) fn pdf_section(input: Span) -> CbParseResult<Vec<PdfSection>> {
                 _ => log::error!("Error in trailer {:?}", err),
             })
             .ok()
-            .map(|(_, trailer)| trailer);
+            .map(|(_, trailer)| trailer)
+            .expect("FIXME: Trailer is required");
         let (remainder_xref, _) = nom::bytes::complete::take(startxref)(input)?;
         let (_, xref) = xref::xref(remainder_xref)?;
 
@@ -121,7 +122,7 @@ pub(crate) fn pdf_section(input: Span) -> CbParseResult<Vec<PdfSection>> {
 
         // The filter ensures that each new section is before the current one, thus
         // preventing a loop.
-        maybe_startxref = trailer.as_ref().and_then(|t| t.previous).filter(|&new| new < startxref);
+        maybe_startxref = trailer.previous.filter(|&new| new < startxref);
         pdf_sections.push(PdfSection { objects, xref, trailer });
     }
 

@@ -31,8 +31,6 @@ impl RawPdf {
             .first()
             .expect("FIXME: We always assert at least one section.")
             .trailer
-            .as_ref()
-            .expect("FIXME: A trailer is required.")
             .root;
         let catalog = self
             .object(
@@ -64,7 +62,7 @@ impl RawPdf {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PdfSection {
     pub(crate) objects: FnvHashMap<usize, Object>,
-    pub(crate) trailer: Option<Trailer>,
+    pub(crate) trailer: Trailer,
     pub(crate) xref: Xref,
 }
 
