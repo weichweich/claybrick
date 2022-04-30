@@ -5,6 +5,8 @@
 /// divided into two groups compressed and uncompressed objects. Uncompressed
 /// objects can be imidiately accessed at the given byte offset while compressed
 /// objects are contained inside a stream object.
+///
+/// The entries are sorted by the object index.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Xref(Vec<XrefEntry>);
 
@@ -30,10 +32,23 @@ impl Xref {
             .iter()
             .filter_map(|entry| if let XrefEntry::Free(u) = entry { Some(u) } else { None })
     }
+
+    pub fn entries(&self) -> impl Iterator<Item = &XrefEntry> {
+        self.0.iter()
+    }
+}
+
+impl std::ops::Deref for Xref {
+    type Target = Vec<XrefEntry>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl From<Vec<XrefEntry>> for Xref {
-    fn from(v: Vec<XrefEntry>) -> Self {
+    fn from(mut v: Vec<XrefEntry>) -> Self {
+        v.sort_by_key(|o| o.number());
         Xref(v)
     }
 }
@@ -65,7 +80,7 @@ pub struct UsedCompressedObject {
     pub number: usize,
     /// The number of the stream object that contains this object
     pub containing_object: usize,
-    /// Next generation number that should be used
+    /// Index of the object in the object streams
     pub index: usize,
 }
 

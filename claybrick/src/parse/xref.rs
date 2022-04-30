@@ -9,7 +9,10 @@ use crate::{
         error::{CbParseError, CbParseErrorKind},
         object, CbParseResult, Span,
     },
-    pdf::xref::{FreeObject, Unsupported, UsedObject, Xref, XrefEntry, XREF_COMPRESSED, XREF_FREE, XREF_USED},
+    pdf::xref::{
+        FreeObject, Unsupported, UsedCompressedObject, UsedObject, Xref, XrefEntry, XREF_COMPRESSED, XREF_FREE,
+        XREF_USED,
+    },
 };
 
 const EOF_MARKER: &[u8] = b"%%EOF";
@@ -147,7 +150,9 @@ fn xref_stream_entry<'a, E: ParseError<Span<'a>>>(
 
 /// Parses the xref-stream data.
 ///
-/// `w` - the length of the three numbers in each stream entry.
+/// `w` - the byte length of the three numbers in each stream entry.
+/// Each entry contains three integers (Type, x, y). The byte length of each
+/// integer is specified by the three w values.
 pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<XrefEntry>> {
     let entry_len: usize = w.iter().sum();
     let mut entries = Vec::<XrefEntry>::with_capacity(input.len() / entry_len);
@@ -173,10 +178,10 @@ pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<
             }),
 
             // type 2 entry (object position - compressed)
-            (XREF_COMPRESSED, next_free, gen) => XrefEntry::Free(FreeObject {
+            (XREF_COMPRESSED, containing_object, object_index) => XrefEntry::UsedCompressed(UsedCompressedObject {
                 number: index,
-                generation: gen,
-                next_free,
+                containing_object,
+                index: object_index,
             }),
 
             // unsupported entry
