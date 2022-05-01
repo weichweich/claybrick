@@ -4,11 +4,13 @@ use std::{collections::HashMap, ops::Deref};
 pub use self::{
     document::{Catalog, CatalogError},
     object::{Array, CbString, IndirectObject, Name, Object, Reference, Stream},
+    trailer::Trailer,
     xref::Xref,
 };
 
 pub mod document;
 pub mod object;
+pub mod trailer;
 pub mod xref;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -64,30 +66,6 @@ pub struct PdfSection {
     pub(crate) objects: FnvHashMap<usize, Object>,
     pub(crate) trailer: Trailer,
     pub(crate) xref: Xref,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Trailer {
-    /// Highest object number used in the PDF document
-    pub size: usize,
-
-    /// Byte offset to the previous PDF section
-    pub previous: Option<usize>,
-
-    /// Reference to the root object
-    pub root: Reference,
-
-    /// Object containing information for decryption.
-    pub encrypt: Option<Object>,
-
-    /// Information for this document
-    pub info: Option<Reference>,
-
-    /// File identifier
-    pub id: Option<[Bytes; 2]>,
-
-    /// Start of the XRef table.
-    pub x_ref_stm: Option<usize>,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]

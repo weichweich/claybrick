@@ -1,7 +1,7 @@
 use nom::error::{ErrorKind, ParseError};
 
 use super::xref::XrefError;
-use crate::{parse::trailer::TrailerError, pdf::object::stream::filter::FilterError};
+use crate::pdf::{object::stream::filter::FilterError, trailer::TrailerError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CbParseErrorKind {
