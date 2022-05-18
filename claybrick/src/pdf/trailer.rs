@@ -30,19 +30,22 @@ pub struct Trailer {
     /// Byte offset to the previous PDF section
     pub previous: Option<usize>,
 
-    /// Reference to the root object
+    /// Reference to the root object.
     pub root: Reference,
 
     /// Dictionary containing information for decryption.
     pub encrypt: Option<Dictionary>,
 
-    /// Information for this document
+    /// Information for this document.
     pub info: Option<Reference>,
 
-    /// File identifier
+    /// File identifier used for encryption.
     pub id: Option<[Bytes; 2]>,
 
     /// Start of the XRef table.
+    ///
+    /// This provides obtional compatibility to readers that don't support XRef
+    /// streams.
     pub x_ref_stm: Option<usize>,
 }
 
