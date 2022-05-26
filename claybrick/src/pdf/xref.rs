@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum XrefKind {
     Table,
-    Stream { number: usize, generation: usize },
+    Stream { number: u32, generation: u32 },
 }
 
 /// References to objects inside a PDF section.
@@ -34,7 +34,7 @@ impl Xref {
         xref
     }
 
-    pub(crate) fn new_stream(entries: Vec<XrefEntry>, number: usize, generation: usize) -> Self {
+    pub(crate) fn new_stream(entries: Vec<XrefEntry>, number: u32, generation: u32) -> Self {
         let mut xref = Self::new(entries);
         xref.kind = Some(XrefKind::Stream { number, generation });
         xref

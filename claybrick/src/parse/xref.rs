@@ -299,7 +299,7 @@ pub(crate) fn xref_stream(input: Span) -> CbParseResult<Xref> {
 
     log::debug!("xref stream data parsed");
 
-    let xref = Xref::new_stream(entries, indirect_obj.index as usize, indirect_obj.generation as usize);
+    let xref = Xref::new_stream(entries, indirect_obj.index, indirect_obj.generation);
     Ok((remainder, xref))
 }
 
