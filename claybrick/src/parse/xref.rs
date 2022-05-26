@@ -112,7 +112,7 @@ fn xref_entries(input: Span) -> CbParseResult<Vec<XrefEntry>> {
 ///
 /// Retruns a vector of free objects or used objects that can be accessed by the
 /// byte offset.
-pub(crate) fn xref_section(input: Span) -> CbParseResult<Vec<XrefEntry>> {
+pub(crate) fn xref_section(input: Span) -> CbParseResult<Xref> {
     // xref keyword
     let (remainder, _) = character::complete::multispace0(input)?;
     let (remainder, _) = bytes::complete::tag(b"xref")(remainder)?;
@@ -123,7 +123,9 @@ pub(crate) fn xref_section(input: Span) -> CbParseResult<Vec<XrefEntry>> {
     for v in entries {
         entries_flatten.extend_from_slice(&v[..]);
     }
-    Ok((remainder, entries_flatten))
+
+    let xref = Xref::new_table(entries_flatten);
+    Ok((remainder, xref))
 }
 
 /// A stream entry consists of 3 numbers with variable length. This function
@@ -200,28 +202,24 @@ pub(crate) fn xref_stream_data(w: [usize; 3], input: Span) -> CbParseResult<Vec<
 }
 
 /// Parse an indirect object that contains a xref stream.
-pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefEntry>> {
+pub(crate) fn xref_stream(input: Span) -> CbParseResult<Xref> {
     let (remainder, obj) = object::indirect_object(input)?;
 
     // get stream that is contained in the indirect object
-    let stream = obj
-        .indirect()
-        .ok_or_else(|| {
-            log::error!("startxref didn't point to an indirect object");
-            nom::Err::Error(CbParseError::new(
-                input,
-                CbParseErrorKind::XrefInvalid(XrefError::StreamObject),
-            ))
-        })?
-        .object
-        .stream()
-        .ok_or_else(|| {
-            log::error!("indirect object didn't contain a stream");
-            nom::Err::Error(CbParseError::new(
-                input,
-                CbParseErrorKind::XrefInvalid(XrefError::StreamObject),
-            ))
-        })?;
+    let indirect_obj = obj.indirect().ok_or_else(|| {
+        log::error!("startxref didn't point to an indirect object");
+        nom::Err::Error(CbParseError::new(
+            input,
+            CbParseErrorKind::XrefInvalid(XrefError::StreamObject),
+        ))
+    })?;
+    let stream = indirect_obj.object.stream().ok_or_else(|| {
+        log::error!("indirect object didn't contain a stream");
+        nom::Err::Error(CbParseError::new(
+            input,
+            CbParseErrorKind::XrefInvalid(XrefError::StreamObject),
+        ))
+    })?;
 
     // get the data that is contained in the stream
     log::trace!("Xref stream: {:?}", stream);
@@ -291,7 +289,7 @@ pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefEntry>> {
         })?,
     ];
 
-    let (_empty, stream) = xref_stream_data(w, data[..].into()).map_err(|err| {
+    let (_empty, entries) = xref_stream_data(w, data[..].into()).map_err(|err| {
         log::error!("Error while parsing xref stream content: {:?}", err);
         nom::Err::Error(CbParseError::new(
             input,
@@ -301,13 +299,14 @@ pub(crate) fn xref_stream(input: Span) -> CbParseResult<Vec<XrefEntry>> {
 
     log::debug!("xref stream data parsed");
 
-    Ok((remainder, stream))
+    let xref = Xref::new_stream(entries, indirect_obj.index as usize, indirect_obj.generation as usize);
+    Ok((remainder, xref))
 }
 
 /// Parse either a xref stream or xref table.
 #[tracable_parser]
 pub fn xref(input: Span) -> CbParseResult<Xref> {
-    branch::alt((combinator::into(xref_section), combinator::into(xref_stream)))(input)
+    branch::alt((xref_section, combinator::into(xref_stream)))(input)
 }
 
 /// Parse the End-Of-File marker and removes it from the end of the input.

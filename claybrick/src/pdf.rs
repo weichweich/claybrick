@@ -63,6 +63,7 @@ impl RawPdf {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PdfSection {
+    /// Mapping from object number to object
     pub(crate) objects: FnvHashMap<usize, Object>,
     pub(crate) trailer: Trailer,
     pub(crate) xref: Xref,

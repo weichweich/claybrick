@@ -1,3 +1,9 @@
+#[derive(Debug, Clone, PartialEq)]
+pub enum XrefKind {
+    Table,
+    Stream { number: usize, generation: usize },
+}
+
 /// References to objects inside a PDF section.
 ///
 /// References in this table mark object indices either as used or unused.
@@ -8,17 +14,40 @@
 ///
 /// The entries are sorted by the object index.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Xref(Vec<XrefEntry>);
+pub struct Xref {
+    /// The entries of the cross reference
+    pub(crate) entries: Vec<XrefEntry>,
+
+    /// An optional associate type
+    pub(crate) kind: Option<XrefKind>,
+}
 
 impl Xref {
+    pub(crate) fn new(mut entries: Vec<XrefEntry>) -> Self {
+        entries.sort_by_key(|o| o.number());
+        Xref { entries, kind: None }
+    }
+
+    pub(crate) fn new_table(entries: Vec<XrefEntry>) -> Self {
+        let mut xref = Self::new(entries);
+        xref.kind = Some(XrefKind::Table);
+        xref
+    }
+
+    pub(crate) fn new_stream(entries: Vec<XrefEntry>, number: usize, generation: usize) -> Self {
+        let mut xref = Self::new(entries);
+        xref.kind = Some(XrefKind::Stream { number, generation });
+        xref
+    }
+
     pub fn used_objects(&self) -> impl Iterator<Item = &UsedObject> {
-        self.0
+        self.entries
             .iter()
             .filter_map(|entry| if let XrefEntry::Used(u) = entry { Some(u) } else { None })
     }
 
     pub fn compressed_objects(&self) -> impl Iterator<Item = &UsedCompressedObject> {
-        self.0.iter().filter_map(|entry| {
+        self.entries.iter().filter_map(|entry| {
             if let XrefEntry::UsedCompressed(u) = entry {
                 Some(u)
             } else {
@@ -28,13 +57,13 @@ impl Xref {
     }
 
     pub fn free_objects(&self) -> impl Iterator<Item = &FreeObject> {
-        self.0
+        self.entries
             .iter()
             .filter_map(|entry| if let XrefEntry::Free(u) = entry { Some(u) } else { None })
     }
 
     pub fn entries(&self) -> impl Iterator<Item = &XrefEntry> {
-        self.0.iter()
+        self.entries.iter()
     }
 }
 
@@ -42,14 +71,13 @@ impl std::ops::Deref for Xref {
     type Target = Vec<XrefEntry>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.entries
     }
 }
 
 impl From<Vec<XrefEntry>> for Xref {
-    fn from(mut v: Vec<XrefEntry>) -> Self {
-        v.sort_by_key(|o| o.number());
-        Xref(v)
+    fn from(v: Vec<XrefEntry>) -> Self {
+        Xref::new(v)
     }
 }
 
