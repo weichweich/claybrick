@@ -149,8 +149,8 @@ impl TryFrom<Dictionary> for Trailer {
 
             x_ref_stm: dict
                 .get(K_X_REF_STM)
-                .ok_or(TrailerError::MissingXRefStm)?
-                .integer()
+                .map(|obj | obj.integer().ok_or(TrailerError::InvalidXRefStm))
+                .transpose()?
                 .map(TryInto::try_into)
                 .transpose()
                 .map_err(|_| TrailerError::InvalidXRefStm)?,
