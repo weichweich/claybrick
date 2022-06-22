@@ -2,8 +2,8 @@ use crate::{pdf::Stream, writer::Encoder};
 
 use crate::simple_encode::SimpleEncoder;
 
-const START_STREAM: &[u8] = b"stream";
-const END_STREAM: &[u8] = b"endstream";
+const START_STREAM: &[u8] = b"stream\n";
+const END_STREAM: &[u8] = b"\nendstream";
 
 impl Encoder<Stream> for SimpleEncoder {
     fn write_to(s: &Stream, writer: &mut dyn crate::writer::Writer) {
