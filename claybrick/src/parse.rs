@@ -84,7 +84,7 @@ pub(crate) fn pdf_section(input: Span) -> CbParseResult<Vec<PdfSection>> {
                 nom::Err::Error(CbParseError {
                     kind: CbParseErrorKind::BackwardSearchNotFound,
                     ..
-                }) => log::debug!("No trailer in PDF section"),
+                }) => log::error!("No trailer in PDF section"),
                 _ => log::error!("Error in trailer {:?}", err),
             })
             .ok()

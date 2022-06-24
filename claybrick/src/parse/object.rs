@@ -97,7 +97,7 @@ fn hex_decode(input: &[u8]) -> Option<Vec<u8>> {
     }
 
     // if there is a remainder the last nibble is zero
-    if let Some(&r) = input.chunks_exact(2).remainder().get(0) {
+    if let Some(&r) = input.chunks_exact(2).remainder().first() {
         out.push(r << 4);
     }
 

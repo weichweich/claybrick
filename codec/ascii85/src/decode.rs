@@ -77,7 +77,7 @@ pub fn decode(mut data: &[u8]) -> Result<Vec<u8>, DecodeError> {
     // get ref to first element or return empty vec if data is empty. We use the ref
     // to the first element in case there is an invalid character in the data. The
     // first element is then used to calculate the index of the char
-    let first = if let Some(first) = data.get(0) {
+    let first = if let Some(first) = data.first() {
         first
     } else {
         return Ok(Vec::with_capacity(0));

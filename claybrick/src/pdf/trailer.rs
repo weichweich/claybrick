@@ -131,7 +131,7 @@ impl TryFrom<Dictionary> for Trailer {
                     if a.len() == 2 {
                         Ok([
                             // TODO: don't clone
-                            a.get(0)
+                            a.first()
                                 .and_then(Object::hex_string)
                                 .ok_or(TrailerError::InvalidId)?
                                 .clone(),
@@ -149,7 +149,7 @@ impl TryFrom<Dictionary> for Trailer {
 
             x_ref_stm: dict
                 .get(K_X_REF_STM)
-                .map(|obj | obj.integer().ok_or(TrailerError::InvalidXRefStm))
+                .map(|obj| obj.integer().ok_or(TrailerError::InvalidXRefStm))
                 .transpose()?
                 .map(TryInto::try_into)
                 .transpose()
