@@ -40,5 +40,6 @@ impl Encoder<Object> for SimpleEncoder {
                 writer.write(r.index.to_string().as_bytes());
             }
         }
+        writer.write(b"\n");
     }
 }

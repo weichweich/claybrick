@@ -7,6 +7,10 @@ impl Name {
     pub const fn new(n: Vec<u8>) -> Self {
         Self(n)
     }
+
+    pub fn from_str(s: &str) -> Self {
+        Self(s.as_bytes().to_owned())
+    }
 }
 
 impl Borrow<[u8]> for Name {
@@ -18,6 +22,12 @@ impl Borrow<[u8]> for Name {
 impl From<Vec<u8>> for Name {
     fn from(v: Vec<u8>) -> Self {
         Name(v)
+    }
+}
+
+impl From<&[u8]> for Name {
+    fn from(v: &[u8]) -> Self {
+        Name(v.to_vec())
     }
 }
 

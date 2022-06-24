@@ -65,6 +65,10 @@ impl Xref {
     pub fn entries(&self) -> impl Iterator<Item = &XrefEntry> {
         self.entries.iter()
     }
+
+    pub fn highest_index(&self) -> usize {
+        self.entries.last().map(|entry| entry.number()).unwrap_or(0)
+    }
 }
 
 impl std::ops::Deref for Xref {

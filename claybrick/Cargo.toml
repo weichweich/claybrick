@@ -31,3 +31,6 @@ name = "xref"
 
 [[example]]
 name = "catalog"
+
+[[example]]
+name = "rw"

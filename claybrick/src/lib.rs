@@ -7,10 +7,13 @@ use parse::parse_complete;
 use pdf::RawPdf;
 
 mod error;
-pub mod parse;
 mod pdf;
-pub mod simple_encode;
+mod simple_encode;
+
+pub mod parse;
 pub mod writer;
+
+pub use crate::simple_encode::SimpleEncoder;
 
 /// Read a PDF file and return the parsed `Pdf`.
 ///
